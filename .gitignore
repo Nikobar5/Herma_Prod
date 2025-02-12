@@ -1,0 +1,4 @@
+dist/
+db_store/*
+uploads/*
+node_modules/

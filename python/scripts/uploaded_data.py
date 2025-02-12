@@ -1,0 +1,262 @@
+import os
+import shutil
+import openpyxl
+import pandas as pd
+import json
+import fitz  # PyMuPDF for PDFs
+import aiofiles
+import chardet
+# import pytesseract # OCR for images
+
+from langchain_core import documents
+from langchain_ollama import ChatOllama
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain.schema.document import Document
+from get_embedding_function import get_embedding_function
+from langchain_chroma import Chroma
+from concurrent.futures import ThreadPoolExecutor
+# from langchain_community.document_loaders.pdf import PyPDFLoader
+# from langchain_community.document_loaders.pdf import PyPDFDirectoryLoader
+from langchain_community.document_loaders.text import TextLoader
+from docx import Document as DocxDocument
+from pptx import Presentation
+from pathlib import Path
+import time
+from PIL import Image  # for images
+
+
+# Run setup.py to setup-dependencies
+
+# class that represents one unit of uploaded data that has been processed, uploaded data is a pdf, a picture, or
+# any other single unit, multiple
+# units represent multiple instances of uploaded data, later down the road implement merging functionality along with
+# renaming but for now each just has the name in the file name. Along with this
+# each uploaded data stores a summary of itself and the path to the
+# vector database that represents it in semantic form for retrieval. The embedding function can encode and
+# decode this so there is no need to store the raw text
+class Uploaded_data:
+    def __init__(self, name, data_path):
+        self.name = name
+        self.data_path = data_path
+        start_time = time.time()
+        self.documents = self.load_documents(data_path)
+        end_time = time.time()
+        print(f"Execution time for load documents is: {end_time - start_time:.6f} seconds")
+        self.data_summary = ""
+        self.vector_database_path = name
+        self.add_to_chroma()
+
+    #   Accepted file types .pdf, .txt, .md, .docx, .pptx, .xlsx, .csv, .json
+    def load_documents(self, data_path):
+        if not os.path.exists(data_path):
+            raise FileNotFoundError(f"File not found: {data_path}")
+        if os.path.isdir(data_path):
+            # document_loader = PyPDFDirectoryLoader(data_path) TO-DO
+            raise FileNotFoundError("Directory loading not supported. Provide a single file.")
+        elif data_path.lower().endswith(".pdf"):
+            # document_loader = PyPDFLoader(data_path)
+            return self._process_pdf(data_path)
+        elif data_path.lower().endswith((".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff")):
+            return self._process_image(data_path)
+        elif data_path.lower().endswith((".txt", ".md")):
+            return self._process_text(data_path)
+        elif data_path.lower().endswith(".docx"):
+            return self._process_word(data_path)
+        elif data_path.lower().endswith(".pptx"):
+            return self._process_pptx(data_path)
+        elif data_path.lower().endswith(".xlsx"):
+            return self._process_excel(data_path)
+        elif data_path.lower().endswith(".csv"):
+            return self._process_csv(data_path)
+        elif data_path.lower().endswith(".json"):
+            return self._process_json(data_path)
+        else:
+            raise ValueError(f"Unsupported file type for: {data_path}")
+        try:
+            return document_loader.load()
+        except Exception as e:
+            raise RuntimeError(f"Failed to load documents from {data_path}: {e}")
+
+    def _process_pdf(self, pdf_path):
+        documents = []
+        doc = fitz.open(pdf_path)
+
+        for i, page in enumerate(doc):
+            text = page.get_text("text")
+            table_text = self._extract_tables_from_pdf(page)
+            combined_text = f"{text}\n\nTables:\n{table_text}" if table_text else text
+
+            documents.append(Document(page_content=combined_text, metadata={"source": pdf_path, "page": i + 1}))
+            # Processing images still in the works, uncomment when functionality is finished
+            # images = self._extract_images_from_pdf(page)
+            # for img_text, img_meta in images:
+            #     documents.append(Document(page_content=img_text, metadata=img_meta))
+
+        return documents
+
+    def _extract_tables_from_pdf(self, page):
+        table_text = []
+        raw_text = page.get_text("text")
+
+        if raw_text:
+            rows = raw_text.split("\n")
+            for row in rows:
+                if "\t" in row or " " in row:  # Table structure detection
+                    table_text.append(row.replace(" ", "\t"))
+            return "\n".join(table_text)
+
+        return ""
+
+    def _extract_images_from_pdf(self, page):
+        extracted_texts = []
+        image_list = page.get_images(full=True)
+
+        for img_index, img in enumerate(image_list):
+            xref = img[0]
+            base_image = page.get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False)
+            img_path = f"temp_image_{xref}.png"
+            base_image.pil_save(img_path)
+
+            img_text = self._process_image(img_path)
+            os.remove(img_path)
+
+            extracted_texts.append(
+                (img_text[0].page_content, {"source": page.parent.name, "page": page.number + 1, "type": "image"}))
+
+        return extracted_texts
+
+    ##### NEED TO AUTOMATE TESSERACT INSTALATION BEFORE IT CAN RUN #####
+    # def _process_image(self, image_path):
+    #     try:
+    #         image = Image.open(image_path)
+    #         text = pytesseract.image_to_string(image)
+    #         return [Document(page_content=text, metadata={"source": image_path})]
+    #     except Exception as e:
+    #         raise RuntimeError(f"Failed to process image {image_path}: {e}")
+
+    def split_documents(self):
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1500,
+            chunk_overlap=40,
+            length_function=len,
+            is_separator_regex=False,
+        )
+        with ThreadPoolExecutor() as executor:
+            results = list(executor.map(text_splitter.split_documents, [self.documents]))
+            return [chunk for sublist in results for chunk in sublist]
+
+    def _process_text(self, text_path):
+        with open(text_path, "r", encoding="utf-8") as f:
+            text = f.read()
+        return [Document(page_content=text, metadata={"source": text_path})]
+
+    def _process_word(self, word_path):
+        try:
+            doc = DocxDocument(word_path)
+            text = "\n".join([p.text for p in doc.paragraphs])
+            return [Document(page_content=text, metadata={"source": word_path})]
+        except Exception as e:
+            raise RuntimeError(f"Failed to process Word document {word_path}: {e}")
+
+    def _process_pptx(self, pptx_path):
+        try:
+            prs = Presentation(pptx_path)
+            text = "\n".join([shape.text for slide in prs.slides for shape in slide.shapes if hasattr(shape, "text")])
+            return [Document(page_content=text, metadata={"source": pptx_path})]
+        except Exception as e:
+            raise RuntimeError(f"Failed to process PowerPoint file {pptx_path}: {e}")
+
+    def _process_excel(self, excel_path):
+        try:
+            wb = openpyxl.load_workbook(excel_path)
+            text = "\n".join(
+                ["\t".join([str(cell.value) for cell in row]) for sheet in wb for row in sheet.iter_rows()])
+            return [Document(page_content=text, metadata={"source": excel_path})]
+        except Exception as e:
+            raise RuntimeError(f"Failed to process Excel file {excel_path}: {e}")
+
+    async def _process_csv(self, csv_path):
+        with open(csv_path, "rb") as f:
+            raw_data = f.read()
+            result = chardet.detect(raw_data)
+            encoding = result["encoding"]
+        if encoding != "utf-8":
+            encoding = "utf-8"
+        async with aiofiles.open(csv_path, "r", encoding=encoding, errors="replace") as f:
+            text = await f.read()
+        return [Document(page_content=text, metadata={"source": csv_path})]
+
+    async def _process_json(self, json_path):
+        async with aiofiles.open(json_path, "r", encoding="utf-8") as f:
+            text = await f.read()
+        return [Document(page_content=text, metadata={"source": json_path})]
+
+    def add_to_chroma(self):
+        start_time = time.time()
+        chunks = self.split_documents()
+        end_time = time.time()
+        print(f"Execution time for split documents is: {end_time - start_time:.6f} seconds")
+        # Load the existing database.
+        db = Chroma(
+            persist_directory=str(Path(
+                '../../storage/db_store') / self.name), embedding_function=get_embedding_function()
+        )
+        start_time = time.time()
+        # Calculate Page IDs.
+        chunks_with_ids = self.calculate_chunk_ids(chunks)
+        end_time = time.time()
+        print(f"Execution time for calculate page IDs is: {end_time - start_time:.6f} seconds")
+        # Add or Update the documents.
+        start_time = time.time()
+        existing_items = db.get(include=[])  # IDs are always included by default
+        existing_ids = set(existing_items["ids"])
+        print(f"Number of existing documents in DB: {len(existing_ids)}")
+        end_time = time.time()
+        print(f"Execution time for add/update documents is: {end_time - start_time:.6f} seconds")
+        start_time = time.time()
+        # Only add documents that don't exist in the DB.
+        # new_chunks = [chunk for chunk in chunks_with_ids if chunk.metadata["id"] not in existing_ids]
+        new_chunks = chunks_with_ids
+        # if new_chunks:
+        new_chunk_ids = [chunk.metadata["id"] for chunk in new_chunks]
+        db.add_documents(new_chunks, ids=new_chunk_ids)
+        print("✅ Added documents")
+        end_time = time.time()
+        print(f"Execution time for adding documents is: {end_time - start_time:.6f} seconds")
+
+    def calculate_chunk_ids(self, chunks):
+
+        # This will create IDs like "data/report.pdf:6:2"
+        # Page Source : Page Number : Chunk Index
+
+        last_page_id = None
+        current_chunk_index = 0
+
+        for chunk in chunks:
+            source = chunk.metadata.get("source", "unknown")
+            page = chunk.metadata.get("page", 0)
+            current_page_id = f"{source} Page: {page}"
+
+            # If the page ID is the same as the last one, increment the index.
+            if current_page_id == last_page_id:
+                current_chunk_index += 1
+            else:
+                current_chunk_index = 0
+
+            # Calculate the chunk ID.
+            chunk_id = f"{current_page_id}:{current_chunk_index}"
+            last_page_id = current_page_id
+
+            # Add it to the page meta-data.
+            chunk.metadata["id"] = chunk_id
+
+        return chunks
+
+    @staticmethod
+    def delete_vector_db(filename):
+        base_path = Path(__file__).resolve().parents[1]  # goes up two levels to project root
+        db_path = base_path / 'storage' / 'db_store' / filename
+
+        if os.path.exists(str(db_path)):
+            shutil.rmtree(str(db_path))
+            print("✨ Clearing Database")
