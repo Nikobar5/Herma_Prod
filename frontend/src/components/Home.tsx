@@ -11,6 +11,7 @@ declare global {
 
 interface Message {
   text: string;
+  htmlContent?: string;
   isUser: boolean;
 }
 
@@ -41,31 +42,39 @@ const Home: React.FC = () => {
     return /\.(jpg|jpeg|png|gif)$/i.test(filename);
   };
 
-  useEffect(() => {
+useEffect(() => {
   const messageHandler = (_event: any, chunk: string) => {
     setMessages(prevMessages => {
       const lastMessage = prevMessages[prevMessages.length - 1];
       if (lastMessage && !lastMessage.isUser) {
-        // Update existing bot message
-        const updatedMessage = {
-          ...lastMessage,
-          text: marked(lastMessage.text + chunk)
-        };
-        return [...prevMessages.slice(0, -1), updatedMessage];
+        // Update existing bot message by just concatenating the raw text
+        // Then apply markdown to the entire message
+        const updatedText = lastMessage.text + chunk;
+        return [
+          ...prevMessages.slice(0, -1),
+          {
+            ...lastMessage,
+            text: updatedText,
+            htmlContent: marked(updatedText) // Store the HTML separately
+          }
+        ];
       } else {
         // Create new bot message
-        return [...prevMessages, { text: marked(chunk), isUser: false }];
+        return [...prevMessages, {
+          text: chunk,
+          htmlContent: marked(chunk),
+          isUser: false
+        }];
       }
     });
   };
 
   ipcRenderer.on('chat-response', messageHandler);
 
-  // Cleanup listener on unmount
   return () => {
     ipcRenderer.removeListener('chat-response', messageHandler);
   };
-  }, []);
+}, []);
 
 //   // Update handleFileUpload to automatically select new files
 //   const handleFileUpload = async (
@@ -187,81 +196,6 @@ const Home: React.FC = () => {
     fetchAndSelectFiles();
   }, []);
 
-//   const handleSubmit = async (event: React.FormEvent) => {
-//     event.preventDefault();
-//
-//     if (!chatMessage.trim()) return;
-//
-//     const currentMessage = chatMessage; // Store chatMessage locally
-//
-//     // Add user message to the message list
-//     const userMessage: Message = { text: currentMessage, isUser: true };
-//     setMessages((prevMessages) => [...prevMessages, userMessage]);
-//     setLoading(true);
-//     setChatMessage("");
-//
-//     const eventSource = new EventSource(`http://127.0.0.1:5001/chat?message=${encodeURIComponent(currentMessage)}`);
-//
-//     eventSource.onmessage = (event) => {
-//         const chunk = event.data;
-//         console.log("Received chunk:", chunk);
-//         setMessages((prevMessages) => {
-//             const lastMessage = prevMessages[prevMessages.length - 1];
-//             console.log("Set last message");
-//             if (lastMessage && !lastMessage.isUser) {
-//                 lastMessage.text += chunk;
-//                 console.log("Concatenated " + chunk);
-//                 return [...prevMessages.slice(0, -1), lastMessage];
-//             } else {
-//                 return [...prevMessages, { text: chunk, isUser: false }];
-//             }
-//         });
-//     };
-//
-//     eventSource.onerror = () => {
-//         console.error("EventSource error:", event);
-//         console.error("Ready state:", eventSource.readyState);
-//         eventSource.close();
-//         setLoading(false);
-//     };
-//   };
-//     const handleSubmit = async (event: React.FormEvent) => {
-//       event.preventDefault();
-//       if (!chatMessage.trim()) return;
-//
-//       const currentMessage = chatMessage;
-//       setMessages(prevMessages => [...prevMessages, { text: currentMessage, isUser: true }]);
-//       setLoading(true);
-//       setChatMessage("");
-//
-//       try {
-//         await ipcRenderer.invoke('start-chat', { message: currentMessage });
-//       } catch (error) {
-//         console.error("Error sending message:", error);
-//       } finally {
-//         setLoading(false);
-//       }
-//     };
-//
-//     // Add this useEffect for chat streaming:
-//     useEffect(() => {
-//       const messageHandler = (_event: any, data: string) => {
-//         setMessages(prevMessages => {
-//           const lastMessage = prevMessages[prevMessages.length - 1];
-//           if (lastMessage && !lastMessage.isUser) {
-//             lastMessage.text += data;
-//             return [...prevMessages.slice(0, -1), lastMessage];
-//           } else {
-//             return [...prevMessages, { text: data, isUser: false }];
-//           }
-//         });
-//       };
-//
-//       ipcRenderer.on('chat-response', messageHandler);
-//       return () => {
-//         ipcRenderer.removeListener('chat-response', messageHandler);
-//       };
-//     }, []);
     const handleSubmit = async (event: React.FormEvent) => {
       event.preventDefault();
       if (!chatMessage.trim()) return;

@@ -1,11 +1,11 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
-const { PythonShell } = require('python-shell');
 const { spawn, exec } = require('child_process');
 const util = require('util');
 const path = require('path');
 const fs = require('fs/promises');
 
 const execAsync = util.promisify(exec);
+
 // Define types for your IPC messages
 interface ChatMessage {
   message: string;
@@ -24,16 +24,117 @@ interface FileSelection {
   filenames: string[];
 }
 
+interface PythonMessage {
+  requestId: string;
+  chunk?: string;
+  error?: string;
+  done?: boolean;
+  success?: boolean;
+}
+
+type MessageCallback = (message: PythonMessage) => void;
+
 const STORAGE_DIR = path.join(app.getPath('userData'), 'storage');
 const PYTHON_DIR = path.join(__dirname, '../../python/scripts');
+
+// Python process state
+let pythonProcess: ReturnType<typeof spawn> | null = null;
+const messageCallbacks = new Map<string, MessageCallback>();
+let requestCounter = 0;
+let buffer = '';
+
+async function initializePythonShell(): Promise<void> {
+  if (pythonProcess) return;
+
+  try {
+    console.log('Initializing Python process...');
+    pythonProcess = spawn('python', [path.join(PYTHON_DIR, 'main.py')], {
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+
+    pythonProcess.stdout.on('data', (data: Buffer) => {
+      buffer += data.toString();
+      let newlineIndex;
+      while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
+        const line = buffer.slice(0, newlineIndex);
+        buffer = buffer.slice(newlineIndex + 1);
+
+        try {
+          const message = JSON.parse(line);
+          if (message.requestId && messageCallbacks.has(message.requestId)) {
+            messageCallbacks.get(message.requestId)!(message);
+          }
+        } catch (err) {
+          console.error('Error parsing Python output:', err);
+        }
+      }
+    });
+
+    pythonProcess.stderr.on('data', (data: Buffer) => {
+      console.error('Python error:', data.toString());
+    });
+
+    pythonProcess.on('close', (code: number) => {
+      console.log(`Python process exited with code ${code}`);
+      messageCallbacks.forEach(callback => {
+        callback({ requestId: '', error: 'Python process closed unexpectedly' });
+      });
+      messageCallbacks.clear();
+
+      pythonProcess = null;
+      setTimeout(initializePythonShell, 1000);
+    });
+
+    // Verify connection
+    await new Promise<void>((resolve, reject) => {
+      const testRequestId = 'test-connection';
+      const timeout = setTimeout(() => {
+        messageCallbacks.delete(testRequestId);
+        reject(new Error('Python process initialization timeout'));
+      }, 5000);
+
+      messageCallbacks.set(testRequestId, (response) => {
+        clearTimeout(timeout);
+        messageCallbacks.delete(testRequestId);
+        if (response.error) {
+          reject(new Error(response.error));
+        } else {
+          resolve();
+        }
+      });
+
+      pythonProcess.stdin.write(
+        JSON.stringify({
+          requestId: testRequestId,
+          command: 'ping',
+          data: {}
+        }) + '\n'
+      );
+    });
+
+    console.log('Python process initialized successfully');
+  } catch (error) {
+    console.error('Failed to initialize Python process:', error);
+    if (pythonProcess) {
+      pythonProcess.kill();
+      pythonProcess = null;
+    }
+    throw error;
+  }
+}
+
+async function ensurePythonShell(): Promise<void> {
+  if (!pythonProcess) {
+    await initializePythonShell();
+  }
+}
 
 function killOllama(): Promise<void> {
   return new Promise((resolve) => {
     const platform = process.platform;
     const command = platform === 'win32' ? 'taskkill /F /IM ollama.exe' : 'killall ollama';
 
-    exec(command, (error: Error | null) => {  // Added type annotation here
-      // Process not found is an expected condition, not an error
+    exec(command, (error: Error | null) => {
       if (error && !error.message.includes('No matching processes')) {
         console.log('Note: No Ollama process was running');
       }
@@ -42,13 +143,9 @@ function killOllama(): Promise<void> {
   });
 }
 
-
 async function startOllama() {
   try {
-    // First try to kill any existing Ollama process
     await killOllama();
-
-    // Wait a moment for the port to be freed
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     const ollama = spawn('ollama', ['serve']);
@@ -65,7 +162,6 @@ async function startOllama() {
       console.log(`Ollama process exited with code ${code}`);
     });
 
-    // Also handle application quit
     app.on('before-quit', async () => {
       try {
         await killOllama();
@@ -79,53 +175,70 @@ async function startOllama() {
   }
 }
 
-
 async function setupIPC() {
+  await initializePythonShell();
+
   // Chat handler
   ipcMain.handle('start-chat', async (event: Electron.IpcMainInvokeEvent, { message }: ChatMessage) => {
+    await ensurePythonShell();
+    const requestId = (++requestCounter).toString();
+
     return new Promise((resolve, reject) => {
-      const pyshell = new PythonShell(path.join(PYTHON_DIR, 'main.py'), {
-        mode: 'json',
-        args: [JSON.stringify({
-            command: 'chat',
-            data: {message }
-            })]
+      messageCallbacks.set(requestId, (response: PythonMessage) => {
+        if (response.error) {
+          messageCallbacks.delete(requestId);
+          reject(new Error(response.error));
+        } else if (response.chunk) {
+          event.sender.send('chat-response', response.chunk);
+        } else if (response.done) {
+          messageCallbacks.delete(requestId);
+          resolve(null);
+        }
       });
 
-      pyshell.on('message', (message: any) => {
-        event.sender.send('chat-response', message.chunk);
-      });
+      if (!pythonProcess) {
+        reject(new Error('Python process not available'));
+        return;
+      }
 
-      pyshell.end((err: Error | null) => {
-        if (err) reject(err);
-        else resolve(null);
-      });
+      pythonProcess.stdin.write(
+        JSON.stringify({
+          requestId,
+          command: 'chat',
+          data: { message }
+        }) + '\n'
+      );
     });
   });
 
   // File upload handler
   ipcMain.handle('upload-file', async (_event: Electron.IpcMainInvokeEvent, { filename, data }: FileUpload) => {
+    await ensurePythonShell();
+    const requestId = (++requestCounter).toString();
     const uploadPath = path.join(STORAGE_DIR, 'uploads');
     await fs.mkdir(uploadPath, { recursive: true });
     const filePath = path.join(uploadPath, filename);
     await fs.writeFile(filePath, data);
 
-    const pyshell = new PythonShell(path.join(PYTHON_DIR, 'main.py'), {
-      mode: 'json',
-      args: [JSON.stringify({
-        operation: 'upload',
-        data: { filename, path: filePath }
-      })]
-    });
-
     return new Promise((resolve, reject) => {
-      pyshell.on('message', (message: any) => {
-        resolve(message);
+      messageCallbacks.set(requestId, (response: PythonMessage) => {
+        messageCallbacks.delete(requestId);
+        if (response.error) reject(new Error(response.error));
+        else resolve(response);
       });
 
-      pyshell.end((err: Error | null) => {
-        if (err) reject(err);
-      });
+      if (!pythonProcess) {
+        reject(new Error('Python process not available'));
+        return;
+      }
+
+      pythonProcess.stdin.write(
+        JSON.stringify({
+          requestId,
+          command: 'upload',
+          data: { filename, filepath: filePath }
+        }) + '\n'
+      );
     });
   });
 
@@ -139,43 +252,55 @@ async function setupIPC() {
 
   // Delete file handler
   ipcMain.handle('delete-file', async (_event: Electron.IpcMainInvokeEvent, { filename }: FileOperation) => {
-    const pyshell = new PythonShell(path.join(PYTHON_DIR, 'main.py'), {
-      mode: 'json',
-      args: [JSON.stringify({
-        operation: 'delete',
-        data: { filename }
-      })]
-    });
+    await ensurePythonShell();
+    const requestId = (++requestCounter).toString();
 
     return new Promise((resolve, reject) => {
-      pyshell.on('message', (message: any) => {
-        resolve(message);
+      messageCallbacks.set(requestId, (response: PythonMessage) => {
+        messageCallbacks.delete(requestId);
+        if (response.error) reject(new Error(response.error));
+        else resolve(response);
       });
 
-      pyshell.end((err: Error | null) => {
-        if (err) reject(err);
-      });
+      if (!pythonProcess) {
+        reject(new Error('Python process not available'));
+        return;
+      }
+
+      pythonProcess.stdin.write(
+        JSON.stringify({
+          requestId,
+          command: 'delete',
+          data: { filename }
+        }) + '\n'
+      );
     });
   });
 
   // Select files handler
   ipcMain.handle('select-files', async (_event: Electron.IpcMainInvokeEvent, { filenames }: FileSelection) => {
-    const pyshell = new PythonShell(path.join(PYTHON_DIR, 'main.py'), {
-      mode: 'json',
-      args: [JSON.stringify({
-        operation: 'select',
-        data: { filenames }
-      })]
-    });
+    await ensurePythonShell();
+    const requestId = (++requestCounter).toString();
 
     return new Promise((resolve, reject) => {
-      pyshell.on('message', (message: any) => {
-        resolve(message);
+      messageCallbacks.set(requestId, (response: PythonMessage) => {
+        messageCallbacks.delete(requestId);
+        if (response.error) reject(new Error(response.error));
+        else resolve(response);
       });
 
-      pyshell.end((err: Error | null) => {
-        if (err) reject(err);
-      });
+      if (!pythonProcess) {
+        reject(new Error('Python process not available'));
+        return;
+      }
+
+      pythonProcess.stdin.write(
+        JSON.stringify({
+          requestId,
+          command: 'select',
+          data: { filenames }
+        }) + '\n'
+      );
     });
   });
 }
@@ -190,17 +315,14 @@ async function createWindow() {
     }
   });
 
-    console.log('NODE_ENV:', process.env.NODE_ENV);
+  console.log('NODE_ENV:', process.env.NODE_ENV);
 
   try {
     console.log('Attempting to load Vite dev server...');
     await win.loadURL('http://localhost:5173');
-
-    // Open DevTools by default during development
     win.webContents.openDevTools();
   } catch (err) {
     console.error('Failed to load Vite dev server:', err);
-    // Fallback to file loading if dev server fails
     console.log('Attempting to load file...');
     win.loadFile(path.join(__dirname, '../../frontend/dist/index.html'));
   }
@@ -215,5 +337,12 @@ app.whenReady().then(async () => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
+  }
+});
+
+app.on('before-quit', () => {
+  if (pythonProcess) {
+    pythonProcess.kill();
+    pythonProcess = null;
   }
 });
