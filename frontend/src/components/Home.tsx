@@ -291,12 +291,13 @@ const Home: React.FC = () => {
         setLoading(false);
       }
     };
+
   return (
     <div className="container">
       <div className="sidebar">
         <div className="logo-container">
-          <img src="logo.png" alt="Logo" className="logo" />
-          <h2>Hermetic</h2>
+        <h2>Hermetic</h2>
+          <img src="boots.jpeg" alt="Logo" className="logo" />
         </div>
         <div className="files-section">
           <h3>Uploaded Files</h3>
@@ -325,7 +326,7 @@ const Home: React.FC = () => {
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
                   </svg>
                 )}
-                {filename}
+                <span className="file-item-text" contentEditable="true">{filename}</span>
                 <button
                   className="delete-button"
                   onClick={(e) => handleDeleteFile(filename, e)}
@@ -354,8 +355,14 @@ const Home: React.FC = () => {
                 className={`message ${
                   msg.isUser ? "user-message" : "bot-message"
                 }`}
-                dangerouslySetInnerHTML={{ __html: msg.text }}
-                />
+              >
+                {!msg.isUser && (
+                  <span className="bot-pfp"> 
+                    <img src="boots.jpeg" alt="Logo" className="bot-logo" />
+                  </span>
+                )}
+                <p className="message-text">{msg.text}</p>
+              </div>
             ))}
             <div ref={messageEndRef} /> {/* Reference for auto-scrolling */}
           </div>
@@ -408,7 +415,10 @@ const Home: React.FC = () => {
         </div>
       ) : (
         <div className="centered-start">
-          <div className="chat-header">Herma</div>
+          <div className="chat-header">
+            <img src="Herma.jpeg" alt="Logo-Center" className="logo-Center" />
+            <span className="center-title" contentEditable="true">Herma</span>
+          </div>
           {loading && <div className="loading">Loading...</div>}
           <form className="chat-form" onSubmit={handleSubmit}>
             <div className="input-container">
