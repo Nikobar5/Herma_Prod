@@ -34,7 +34,8 @@ interface PythonMessage {
 
 type MessageCallback = (message: PythonMessage) => void;
 
-const STORAGE_DIR = path.join(app.getPath('userData'), 'storage');
+const STORAGE_DIR = path.join(__dirname, '../../storage');
+const UPLOADS_DIR = path.join(STORAGE_DIR, 'uploads');
 const PYTHON_DIR = path.join(__dirname, '../../python/scripts');
 
 // Python process state
@@ -59,13 +60,18 @@ async function initializePythonShell(): Promise<void> {
         const line = buffer.slice(0, newlineIndex);
         buffer = buffer.slice(newlineIndex + 1);
 
-        try {
-          const message = JSON.parse(line);
-          if (message.requestId && messageCallbacks.has(message.requestId)) {
-            messageCallbacks.get(message.requestId)!(message);
-          }
-        } catch (err) {
-          console.error('Error parsing Python output:', err);
+        if (line.trim().startsWith('{')) {
+            try {
+                const message = JSON.parse(line);
+                if (message.requestId && messageCallbacks.has(message.requestId)) {
+                      messageCallbacks.get(message.requestId)!(message);
+                }
+            } catch (err) {
+                console.error('Error parsing Python output:', err);
+            }
+        } else {
+            // Regular debug output, just log to console
+            console.log('Python:', line);
         }
       }
     });
@@ -211,37 +217,36 @@ async function setupIPC() {
     });
   });
 
-  // File upload handler
-  ipcMain.handle('upload-file', async (_event: Electron.IpcMainInvokeEvent, { filename, data }: FileUpload) => {
-    await ensurePythonShell();
-    const requestId = (++requestCounter).toString();
-    const uploadPath = path.join(STORAGE_DIR, 'uploads');
-    await fs.mkdir(uploadPath, { recursive: true });
-    const filePath = path.join(uploadPath, filename);
-    await fs.writeFile(filePath, data);
+// File upload handler
+ipcMain.handle('upload-file', async (_event: Electron.IpcMainInvokeEvent, { filename, data }: FileUpload) => {
+  await ensurePythonShell();
+  const requestId = (++requestCounter).toString();
+  const uploadPath = path.join(STORAGE_DIR, 'uploads');
+  await fs.mkdir(uploadPath, { recursive: true });
+  const tempPath = path.join(uploadPath, `temp_${filename}`);
+  await fs.writeFile(tempPath, data);
 
-    return new Promise((resolve, reject) => {
-      messageCallbacks.set(requestId, (response: PythonMessage) => {
-        messageCallbacks.delete(requestId);
-        if (response.error) reject(new Error(response.error));
-        else resolve(response);
-      });
-
-      if (!pythonProcess) {
-        reject(new Error('Python process not available'));
-        return;
-      }
-
-      pythonProcess.stdin.write(
-        JSON.stringify({
-          requestId,
-          command: 'upload',
-          data: { filename, filepath: filePath }
-        }) + '\n'
-      );
+  return new Promise((resolve, reject) => {
+    messageCallbacks.set(requestId, (response: PythonMessage) => {
+      messageCallbacks.delete(requestId);
+      if (response.error) reject(new Error(response.error));
+      else resolve(response);
     });
-  });
 
+    if (!pythonProcess) {
+      reject(new Error('Python process not available'));
+      return;
+    }
+
+    pythonProcess.stdin.write(
+      JSON.stringify({
+        requestId,
+        command: 'upload',
+        data: { filename, filepath: tempPath }
+      }) + '\n'
+    );
+  });
+});
   // Get files handler
   ipcMain.handle('get-files', async () => {
     const uploadPath = path.join(STORAGE_DIR, 'uploads');
