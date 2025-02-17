@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from "react";
-//import axios from "axios";
 const { ipcRenderer } = window.require('electron');
 import {marked} from 'marked';
 
@@ -15,6 +14,10 @@ interface Message {
   isUser: boolean;
 }
 
+interface ClickTimer {
+  [key: string]: number;
+}
+
 const Home: React.FC = () => {
   const [chatMessage, setChatMessage] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
@@ -22,6 +25,7 @@ const Home: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([]);
+  const [clickTimers, setClickTimers] = useState<ClickTimer>({});
 
   const messageEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -76,35 +80,7 @@ useEffect(() => {
   };
 }, []);
 
-//   // Update handleFileUpload to automatically select new files
-//   const handleFileUpload = async (
-//     event: React.ChangeEvent<HTMLInputElement>
-//   ) => {
-//     const file = event.target.files?.[0];
-//     if (!file) return;
-//
-//     setIsUploading(true);
-//     const formData = new FormData();
-//     formData.append("file", file);
-//
-//     try {
-//       await axios.post("http://127.0.0.1:5001/upload", formData, {
-//         headers: { "Content-Type": "multipart/form-data" },
-//       });
-//       // Fetch updated file list after successful upload
-//       const response = await axios.get("http://127.0.0.1:5001/files");
-//       setUploadedFiles(response.data.files);
-//
-//       // Automatically select the new file for context
-//       await axios.post("http://127.0.0.1:5001/select-files", {
-//         filenames: response.data.files,
-//       });
-//     } catch (error) {
-//       console.error("Error uploading file:", error);
-//     } finally {
-//       setIsUploading(false);
-//     }
-//   };
+    // Handle file upload
     const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
       if (!file) return;
@@ -127,21 +103,7 @@ useEffect(() => {
       }
     };
 
-  // File retrieve for sidebar and state
-//   const fetchAndSelectFiles = async () => {
-//     try {
-//       const response = await axios.get("http://127.0.0.1:5001/files");
-//       console.log("Fetched files response:", response);
-//       setUploadedFiles(response.data.files);
-//       // Automatically select all files for context
-//       await axios.post("http://127.0.0.1:5001/select-files", {
-//         filenames: response.data.files,
-//       });
-//       console.log("Select files response:", selectResponse);
-//     } catch (error) {
-//       console.error("Error fetching files:", error);
-//     }
-//   };
+    // Fetch files and select them
     const fetchAndSelectFiles = async () => {
       try {
         const files = await ipcRenderer.invoke('get-files');
@@ -152,32 +114,30 @@ useEffect(() => {
       }
     };
 
-  // Make files clickable
-//   const handleFileClick = (filename: string) => {
-//     const fileUrl = `http://127.0.0.1:5001/view/${filename}`;
-//     window.open(fileUrl, "_blank");
-//   };
+    // Handle file click
     const handleFileClick = async (filename: string) => {
-      try {
-        await ipcRenderer.invoke('open-file', { filename });
-      } catch (error) {
-        console.error("Error opening file:", error);
+      const now = Date.now();
+      const lastClick = clickTimers[filename] || 0;
+      const isDoubleClick = now - lastClick < 300; // 300ms threshold for double click
+
+      // Update the last click time
+      setClickTimers(prev => ({
+        ...prev,
+        [filename]: now
+      }));
+
+      if (isDoubleClick) {
+        try {
+          // Use the IPC handler to open the file with the system's default application
+          await ipcRenderer.invoke('open-file', { filename });
+        } catch (error) {
+          console.error("Error opening file:", error);
+          // Optionally show an error message to the user
+          alert(`Failed to open file: ${error.message}`);
+        }
       }
     };
 
-  // Deletes file from the server
-//   const handleDeleteFile = async (filename: string, e: React.MouseEvent) => {
-//     e.stopPropagation(); // Prevent triggering file click
-//
-//     if (window.confirm(`Are you sure you want to delete ${filename}?`)) {
-//       try {
-//         await axios.delete(`http://127.0.0.1:5001/delete/${filename}`);
-//         await fetchAndSelectFiles(); // Refresh file list
-//       } catch (error) {
-//         console.error("Error deleting file:", error);
-//       }
-//     }
-//   };
     const handleDeleteFile = async (filename: string, e: React.MouseEvent) => {
       e.stopPropagation();
 
@@ -240,7 +200,10 @@ useEffect(() => {
                 key={index}
                 className="file-item"
                 onClick={() => handleFileClick(filename)}
-                style={{ cursor: "pointer" }}
+                style={{
+                    cursor: "pointer",
+                    userSelect: "none"
+                }}
               >
                 {isImage(filename) ? (
                   <img

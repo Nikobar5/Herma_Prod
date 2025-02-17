@@ -3,6 +3,7 @@ const { spawn, exec } = require('child_process');
 const util = require('util');
 const path = require('path');
 const fs = require('fs/promises');
+const { shell } = require('electron');
 
 const execAsync = util.promisify(exec);
 
@@ -301,6 +302,24 @@ ipcMain.handle('upload-file', async (_event: Electron.IpcMainInvokeEvent, { file
       );
     });
   });
+ipcMain.handle('open-file', async (_event: Electron.IpcMainInvokeEvent, { filename }: { filename: string }) => {
+  try {
+    const filePath = path.join(UPLOADS_DIR, filename);
+
+    // Check if file exists
+    await fs.access(filePath);
+
+    // Open file with default system application
+    await shell.openPath(filePath);
+
+    return { success: true };
+  } catch (error: unknown) {
+    console.error('Error opening file:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    throw new Error(`Failed to open file: ${errorMessage}`);
+  }
+});
+
 
   // Select files handler
   ipcMain.handle('select-files', async (_event: Electron.IpcMainInvokeEvent, { filenames }: FileSelection) => {
