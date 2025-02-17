@@ -26,7 +26,7 @@ class PythonServer:
 
         # Store data file in storage directory
         self.uploaded_data_store = DataStore(pickle_path)
-        self.session = Session(currently_used_data=self.uploaded_data_store.data)
+        self.session = Session(currently_used_data=[])
         self.is_running = True
 
     def handle_signal(self, signum, frame):

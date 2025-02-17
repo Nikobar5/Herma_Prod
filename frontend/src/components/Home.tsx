@@ -26,6 +26,7 @@ const Home: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([]);
   const [clickTimers, setClickTimers] = useState<ClickTimer>({});
+  const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
 
   const messageEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -96,6 +97,12 @@ useEffect(() => {
         // Get updated file list
         const files = await ipcRenderer.invoke('get-files');
         setUploadedFiles(files);
+
+        // Automatically select the new file
+        setSelectedFiles(prev => [...prev, file.name]);
+        await ipcRenderer.invoke('select-files', {
+          filenames: [...selectedFiles, file.name]
+        });
       } catch (error) {
         console.error("Error uploading file:", error);
       } finally {
@@ -108,7 +115,6 @@ useEffect(() => {
       try {
         const files = await ipcRenderer.invoke('get-files');
         setUploadedFiles(files);
-        await ipcRenderer.invoke('select-files', { filenames: files });
       } catch (error) {
         console.error("Error fetching files:", error);
       }
@@ -118,23 +124,29 @@ useEffect(() => {
     const handleFileClick = async (filename: string) => {
       const now = Date.now();
       const lastClick = clickTimers[filename] || 0;
-      const isDoubleClick = now - lastClick < 300; // 300ms threshold for double click
+      const isDoubleClick = now - lastClick < 300;
 
-      // Update the last click time
       setClickTimers(prev => ({
         ...prev,
         [filename]: now
       }));
 
       if (isDoubleClick) {
+        // Open file on double click
         try {
-          // Use the IPC handler to open the file with the system's default application
           await ipcRenderer.invoke('open-file', { filename });
         } catch (error) {
           console.error("Error opening file:", error);
-          // Optionally show an error message to the user
-          alert(`Failed to open file: ${error.message}`);
         }
+      } else {
+        // Toggle selection on single click
+        const isSelected = selectedFiles.includes(filename);
+        const newSelectedFiles = isSelected
+          ? selectedFiles.filter(f => f !== filename)
+          : [...selectedFiles, filename];
+
+        setSelectedFiles(newSelectedFiles);
+        await ipcRenderer.invoke('select-files', { filenames: newSelectedFiles });
       }
     };
 
@@ -198,7 +210,7 @@ useEffect(() => {
             {uploadedFiles.map((filename, index) => (
               <li
                 key={index}
-                className="file-item"
+                className={`file-item ${selectedFiles.includes(filename) ? 'file-selected' : ''}`}
                 onClick={() => handleFileClick(filename)}
                 style={{
                     cursor: "pointer",
