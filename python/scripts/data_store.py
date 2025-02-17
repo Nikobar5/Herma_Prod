@@ -7,14 +7,42 @@ class DataStore:
         self.data = self._load()
 
     def _load(self):
-        if os.path.exists(self.filename):
+        try:
+            if not os.path.exists(self.filename):
+                print("debug: No existing pickle file, starting fresh")
+                return []
+
+            if os.path.getsize(self.filename) == 0:
+                print("debug: Empty pickle file, starting fresh")
+                return []
+
             with open(self.filename, 'rb') as file:
-                return pickle.load(file)
-        return []
+                try:
+                    return pickle.load(file)
+                except (EOFError, pickle.UnpicklingError):
+                    print("debug: Corrupted pickle file, starting fresh")
+                    return []
+        except Exception as e:
+            print("debug: Unexpected error in _load")
+            return []
 
     def save(self):
-        with open(self.filename, 'wb') as file:
-            pickle.dump(self.data, file)
+        """Save data to pickle file"""
+        print(f"Saving DataStore. Current data length: {len(self.data)}")
+        try:
+            # Create the directory if it doesn't exist
+            os.makedirs(os.path.dirname(self.filename), exist_ok=True)
+
+            # Save to temporary file first
+            temp_file = f"{self.filename}.tmp"
+            with open(temp_file, 'wb') as file:
+                pickle.dump(self.data, file)
+
+            # Rename temp file to actual file (atomic operation)
+            os.replace(temp_file, self.filename)
+            print(f"DataStore saved successfully to {self.filename}")
+        except Exception as e:
+            print(f"Failed to save DataStore: {str(e)}")
 
     def add(self, item):
         self.data.append(item)

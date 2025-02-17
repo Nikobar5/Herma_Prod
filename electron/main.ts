@@ -168,18 +168,38 @@ async function startOllama() {
       console.log(`Ollama process exited with code ${code}`);
     });
 
-    app.on('before-quit', async () => {
-      try {
-        await killOllama();
-      } catch (error) {
-        console.error('Error shutting down Ollama:', error);
-      }
-    });
-
   } catch (error) {
     console.error('Error starting Ollama:', error);
   }
 }
+
+// Remove the duplicate startOllama function and move the before-quit handler outside
+
+app.on('before-quit', async () => {
+  try {
+    // First send shutdown to Python
+    if (pythonProcess) {
+      pythonProcess.stdin.write(
+        JSON.stringify({
+          requestId: 'shutdown',
+          command: 'shutdown',
+          data: {}
+        }) + '\n'
+      );
+
+      // Give Python time to save
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      pythonProcess.kill();
+      pythonProcess = null;
+    }
+
+    // Then kill Ollama
+    await killOllama();
+  } catch (error) {
+    console.error('Error during shutdown:', error);
+  }
+});
 
 async function setupIPC() {
   await initializePythonShell();

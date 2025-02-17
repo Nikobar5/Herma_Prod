@@ -7,7 +7,7 @@ from pathlib import Path
 from session import Session
 from uploaded_data import Uploaded_data
 from data_store import DataStore
-
+import signal
 
 class PythonServer:
     def __init__(self):
@@ -19,12 +19,22 @@ class PythonServer:
         self.storage_dir.mkdir(exist_ok=True)
         self.upload_dir.mkdir(exist_ok=True)
 
-        # Store data file in storage directory
-        self.uploaded_data_store = DataStore(str(self.storage_dir / "uploaded_data_store.pkl"))
-        self.session = Session(currently_used_data=[])
+        pickle_path = str(self.storage_dir.resolve() / "uploaded_data_store.pkl")
 
-        # Register save function to run on exit
-        atexit.register(self.uploaded_data_store.save)
+        signal.signal(signal.SIGINT, self.handle_signal)
+        signal.signal(signal.SIGTERM, self.handle_signal)
+
+        # Store data file in storage directory
+        self.uploaded_data_store = DataStore(pickle_path)
+        self.session = Session(currently_used_data=self.uploaded_data_store.data)
+        self.is_running = True
+
+    def handle_signal(self, signum, frame):
+        """Handle shutdown signals"""
+        print(f"Received signal {signum}, saving data and shutting down...")
+        self.uploaded_data_store.save()
+        self.is_running = False
+        sys.exit(0)
 
     def handle_ping(self, request_id):
         """Handle ping command to verify connection"""
@@ -51,6 +61,16 @@ class PythonServer:
                 "requestId": request_id,
                 "error": str(e)
             }), flush=True)
+
+    def handle_shutdown(self, request_id):
+        """Handle shutdown command"""
+        print("Received shutdown command, ending run loop...")
+        self.is_running = False
+        print(json.dumps({
+            "requestId": request_id,
+            "success": True,
+            "done": True
+        }), flush=True)
 
     def handle_select(self, request_id, data):
         """Handle file selection for context"""
@@ -160,7 +180,7 @@ class PythonServer:
             }), flush=True)
 
     def run(self):
-        while True:
+        while self.is_running:
             try:
                 line = sys.stdin.readline()
                 if not line:
@@ -181,6 +201,8 @@ class PythonServer:
                     self.handle_delete(request_id, payload)
                 elif command == 'select':
                     self.handle_select(request_id, payload)
+                elif command == 'shutdown':
+                    self.handle_shutdown(request_id)
                 else:
                     print(json.dumps({
                         "requestId": request_id,
@@ -194,6 +216,7 @@ class PythonServer:
                 if 'request_id' in locals():
                     error_msg["requestId"] = request_id
                 print(json.dumps(error_msg), flush=True)
+        self.uploaded_data_store.save()
 
 
 if __name__ == "__main__":
