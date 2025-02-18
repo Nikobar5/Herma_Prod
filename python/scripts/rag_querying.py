@@ -13,7 +13,9 @@ def query_rag(query_text: str, vector_database_directory):
     end_time = time.time()
     print(f"Execution time for get_embedding_function is: {end_time - start_time:.6f} seconds")
     start_time = time.time()
-    db = Chroma(persist_directory=str(Path('vector_db_store') / vector_database_directory), embedding_function=embedding_function)
+    db_root = Path(__file__).resolve().parents[2] / 'storage' / 'db_store'
+    full_db_path = db_root / vector_database_directory
+    db = Chroma(persist_directory=str(full_db_path), embedding_function=embedding_function)
     end_time = time.time()
     print(f"Execution time for retrieving database is: {end_time - start_time:.6f} seconds")
     # Search the DB.

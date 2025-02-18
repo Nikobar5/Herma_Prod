@@ -25,7 +25,7 @@ def main():
     # uploaded_data = Uploaded_data("coundouriotis00902 copy.pdf", 'data/coundouriotis00902 copy.pdf')
     # uploaded_data_store.add(uploaded_data)
     # currently_used_data_list.append(uploaded_data)
-    session1 = Session(currently_used_data=None)
+    session1 = Session(currently_used_data=[])
     query = ""
     print("How can I help you?")
     while query != "exit":

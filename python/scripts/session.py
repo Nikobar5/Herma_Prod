@@ -35,7 +35,7 @@ class Session:
         # Get context from all uploaded files selected
         context = None
         formatted_sources = None
-        if self.currently_used_data != None:
+        if self.currently_used_data != []:
             context = ""
             sources_text = ""
             for data in self.currently_used_data:

@@ -43,7 +43,7 @@ class Uploaded_data:
         end_time = time.time()
         print(f"Execution time for load documents is: {end_time - start_time:.6f} seconds")
         self.data_summary = ""
-        self.vector_database_path = name
+        self.vector_database_path = str(name)
         self.add_to_chroma()
 
     #   Accepted file types .pdf, .txt, .md, .docx, .pptx, .xlsx, .csv, .json
@@ -197,9 +197,10 @@ class Uploaded_data:
         end_time = time.time()
         print(f"Execution time for split documents is: {end_time - start_time:.6f} seconds")
         # Load the existing database.
+        db_path = self.get_db_path()
         db = Chroma(
-            persist_directory=str(Path(
-                '../../storage/db_store') / self.name), embedding_function=get_embedding_function()
+            persist_directory=str(db_path),
+            embedding_function=get_embedding_function()
         )
         start_time = time.time()
         # Calculate Page IDs.
@@ -220,7 +221,7 @@ class Uploaded_data:
         # if new_chunks:
         new_chunk_ids = [chunk.metadata["id"] for chunk in new_chunks]
         db.add_documents(new_chunks, ids=new_chunk_ids)
-        print("✅ Added documents")
+        print("Added documents")
         end_time = time.time()
         print(f"Execution time for adding documents is: {end_time - start_time:.6f} seconds")
 
@@ -253,10 +254,18 @@ class Uploaded_data:
         return chunks
 
     @staticmethod
+    def get_project_root():
+        """Get the absolute path to the project root"""
+        return Path(__file__).resolve().parents[2]  # Goes up three levels: python/scripts -> python -> root
+
+    def get_db_path(self):
+        """Get the vector database path for this uploaded data"""
+        return self.get_project_root() / 'storage' / 'db_store' / self.name
+
+    @staticmethod
     def delete_vector_db(filename):
-        base_path = Path(__file__).resolve().parents[1]  # goes up two levels to project root
-        db_path = base_path / 'storage' / 'db_store' / filename
+        db_path = Uploaded_data.get_project_root() / 'storage' / 'db_store' / filename
 
         if os.path.exists(str(db_path)):
             shutil.rmtree(str(db_path))
-            print("✨ Clearing Database")
+            print("Clearing Database")

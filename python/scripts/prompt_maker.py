@@ -27,4 +27,5 @@ def make_prompt(input, context):
             MessagesPlaceholder(variable_name="chat_history"),
             ("human", "{input}"),
         ])
+    print(prompt)
     return prompt

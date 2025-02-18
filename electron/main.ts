@@ -3,6 +3,7 @@ const { spawn, exec } = require('child_process');
 const util = require('util');
 const path = require('path');
 const fs = require('fs/promises');
+const { shell } = require('electron');
 
 const execAsync = util.promisify(exec);
 
@@ -34,7 +35,8 @@ interface PythonMessage {
 
 type MessageCallback = (message: PythonMessage) => void;
 
-const STORAGE_DIR = path.join(app.getPath('userData'), 'storage');
+const STORAGE_DIR = path.join(__dirname, '../../storage');
+const UPLOADS_DIR = path.join(STORAGE_DIR, 'uploads');
 const PYTHON_DIR = path.join(__dirname, '../../python/scripts');
 
 // Python process state
@@ -59,13 +61,18 @@ async function initializePythonShell(): Promise<void> {
         const line = buffer.slice(0, newlineIndex);
         buffer = buffer.slice(newlineIndex + 1);
 
-        try {
-          const message = JSON.parse(line);
-          if (message.requestId && messageCallbacks.has(message.requestId)) {
-            messageCallbacks.get(message.requestId)!(message);
-          }
-        } catch (err) {
-          console.error('Error parsing Python output:', err);
+        if (line.trim().startsWith('{')) {
+            try {
+                const message = JSON.parse(line);
+                if (message.requestId && messageCallbacks.has(message.requestId)) {
+                      messageCallbacks.get(message.requestId)!(message);
+                }
+            } catch (err) {
+                console.error('Error parsing Python output:', err);
+            }
+        } else {
+            // Regular debug output, just log to console
+            console.log('Python:', line);
         }
       }
     });
@@ -162,18 +169,38 @@ async function startOllama() {
       console.log(`Ollama process exited with code ${code}`);
     });
 
-    app.on('before-quit', async () => {
-      try {
-        await killOllama();
-      } catch (error) {
-        console.error('Error shutting down Ollama:', error);
-      }
-    });
-
   } catch (error) {
     console.error('Error starting Ollama:', error);
   }
 }
+
+// Remove the duplicate startOllama function and move the before-quit handler outside
+
+app.on('before-quit', async () => {
+  try {
+    // First send shutdown to Python
+    if (pythonProcess) {
+      pythonProcess.stdin.write(
+        JSON.stringify({
+          requestId: 'shutdown',
+          command: 'shutdown',
+          data: {}
+        }) + '\n'
+      );
+
+      // Give Python time to save
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      pythonProcess.kill();
+      pythonProcess = null;
+    }
+
+    // Then kill Ollama
+    await killOllama();
+  } catch (error) {
+    console.error('Error during shutdown:', error);
+  }
+});
 
 async function setupIPC() {
   await initializePythonShell();
@@ -211,37 +238,36 @@ async function setupIPC() {
     });
   });
 
-  // File upload handler
-  ipcMain.handle('upload-file', async (_event: Electron.IpcMainInvokeEvent, { filename, data }: FileUpload) => {
-    await ensurePythonShell();
-    const requestId = (++requestCounter).toString();
-    const uploadPath = path.join(STORAGE_DIR, 'uploads');
-    await fs.mkdir(uploadPath, { recursive: true });
-    const filePath = path.join(uploadPath, filename);
-    await fs.writeFile(filePath, data);
+// File upload handler
+ipcMain.handle('upload-file', async (_event: Electron.IpcMainInvokeEvent, { filename, data }: FileUpload) => {
+  await ensurePythonShell();
+  const requestId = (++requestCounter).toString();
+  const uploadPath = path.join(STORAGE_DIR, 'uploads');
+  await fs.mkdir(uploadPath, { recursive: true });
+  const tempPath = path.join(uploadPath, `temp_${filename}`);
+  await fs.writeFile(tempPath, data);
 
-    return new Promise((resolve, reject) => {
-      messageCallbacks.set(requestId, (response: PythonMessage) => {
-        messageCallbacks.delete(requestId);
-        if (response.error) reject(new Error(response.error));
-        else resolve(response);
-      });
-
-      if (!pythonProcess) {
-        reject(new Error('Python process not available'));
-        return;
-      }
-
-      pythonProcess.stdin.write(
-        JSON.stringify({
-          requestId,
-          command: 'upload',
-          data: { filename, filepath: filePath }
-        }) + '\n'
-      );
+  return new Promise((resolve, reject) => {
+    messageCallbacks.set(requestId, (response: PythonMessage) => {
+      messageCallbacks.delete(requestId);
+      if (response.error) reject(new Error(response.error));
+      else resolve(response);
     });
-  });
 
+    if (!pythonProcess) {
+      reject(new Error('Python process not available'));
+      return;
+    }
+
+    pythonProcess.stdin.write(
+      JSON.stringify({
+        requestId,
+        command: 'upload',
+        data: { filename, filepath: tempPath }
+      }) + '\n'
+    );
+  });
+});
   // Get files handler
   ipcMain.handle('get-files', async () => {
     const uploadPath = path.join(STORAGE_DIR, 'uploads');
@@ -276,6 +302,24 @@ async function setupIPC() {
       );
     });
   });
+ipcMain.handle('open-file', async (_event: Electron.IpcMainInvokeEvent, { filename }: { filename: string }) => {
+  try {
+    const filePath = path.join(UPLOADS_DIR, filename);
+
+    // Check if file exists
+    await fs.access(filePath);
+
+    // Open file with default system application
+    await shell.openPath(filePath);
+
+    return { success: true };
+  } catch (error: unknown) {
+    console.error('Error opening file:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    throw new Error(`Failed to open file: ${errorMessage}`);
+  }
+});
+
 
   // Select files handler
   ipcMain.handle('select-files', async (_event: Electron.IpcMainInvokeEvent, { filenames }: FileSelection) => {
