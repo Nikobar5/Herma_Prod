@@ -47,7 +47,7 @@ const Home: React.FC = () => {
     return /\.(jpg|jpeg|png|gif)$/i.test(filename);
   };
 
-useEffect(() => {
+  useEffect(() => {
   const messageHandler = (_event: any, chunk: string) => {
     setMessages(prevMessages => {
       const lastMessage = prevMessages[prevMessages.length - 1];
@@ -58,7 +58,7 @@ useEffect(() => {
         return [
           ...prevMessages.slice(0, -1),
           {
-            ...lastMessage,
+          ...lastMessage,
             text: updatedText,
             htmlContent: marked(updatedText) // Store the HTML separately
           }
@@ -76,10 +76,11 @@ useEffect(() => {
 
   ipcRenderer.on('chat-response', messageHandler);
 
+  // Cleanup listener on unmount
   return () => {
     ipcRenderer.removeListener('chat-response', messageHandler);
   };
-}, []);
+  }, []);
 
     // Handle file upload
     const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -168,6 +169,81 @@ useEffect(() => {
     fetchAndSelectFiles();
   }, []);
 
+//   const handleSubmit = async (event: React.FormEvent) => {
+//     event.preventDefault();
+//
+//     if (!chatMessage.trim()) return;
+//
+//     const currentMessage = chatMessage; // Store chatMessage locally
+//
+//     // Add user message to the message list
+//     const userMessage: Message = { text: currentMessage, isUser: true };
+//     setMessages((prevMessages) => [...prevMessages, userMessage]);
+//     setLoading(true);
+//     setChatMessage("");
+//
+//     const eventSource = new EventSource(`http://127.0.0.1:5001/chat?message=${encodeURIComponent(currentMessage)}`);
+//
+//     eventSource.onmessage = (event) => {
+//         const chunk = event.data;
+//         console.log("Received chunk:", chunk);
+//         setMessages((prevMessages) => {
+//             const lastMessage = prevMessages[prevMessages.length - 1];
+//             console.log("Set last message");
+//             if (lastMessage && !lastMessage.isUser) {
+//                 lastMessage.text += chunk;
+//                 console.log("Concatenated " + chunk);
+//                 return [...prevMessages.slice(0, -1), lastMessage];
+//             } else {
+//                 return [...prevMessages, { text: chunk, isUser: false }];
+//             }
+//         });
+//     };
+//
+//     eventSource.onerror = () => {
+//         console.error("EventSource error:", event);
+//         console.error("Ready state:", eventSource.readyState);
+//         eventSource.close();
+//         setLoading(false);
+//     };
+//   };
+//     const handleSubmit = async (event: React.FormEvent) => {
+//       event.preventDefault();
+//       if (!chatMessage.trim()) return;
+//
+//       const currentMessage = chatMessage;
+//       setMessages(prevMessages => [...prevMessages, { text: currentMessage, isUser: true }]);
+//       setLoading(true);
+//       setChatMessage("");
+//
+//       try {
+//         await ipcRenderer.invoke('start-chat', { message: currentMessage });
+//       } catch (error) {
+//         console.error("Error sending message:", error);
+//       } finally {
+//         setLoading(false);
+//       }
+//     };
+//
+//     // Add this useEffect for chat streaming:
+//     useEffect(() => {
+//       const messageHandler = (_event: any, data: string) => {
+//         setMessages(prevMessages => {
+//           const lastMessage = prevMessages[prevMessages.length - 1];
+//           if (lastMessage && !lastMessage.isUser) {
+//             lastMessage.text += data;
+//             return [...prevMessages.slice(0, -1), lastMessage];
+//           } else {
+//             return [...prevMessages, { text: data, isUser: false }];
+//           }
+//         });
+//       };
+//
+//       ipcRenderer.on('chat-response', messageHandler);
+//       return () => {
+//         ipcRenderer.removeListener('chat-response', messageHandler);
+//       };
+//     }, []);
     const handleSubmit = async (event: React.FormEvent) => {
       event.preventDefault();
       if (!chatMessage.trim()) return;
@@ -201,8 +277,8 @@ useEffect(() => {
     <div className="container">
       <div className="sidebar">
         <div className="logo-container">
-          <img src="logo.png" alt="Logo" className="logo" />
-          <h2>Hermetic</h2>
+        <h2>Herma</h2>
+          <img src="boots.jpeg" alt="Logo" className="logo" />
         </div>
         <div className="files-section">
           <h3>Uploaded Files</h3>
@@ -315,13 +391,16 @@ useEffect(() => {
         </div>
       ) : (
         <div className="centered-start">
-          <div className="chat-header">Herma</div>
+          <div className="chat-header">
+            <img src="Herma.jpeg" alt="Logo-Center" className="logo-Center" />
+            <span className="center-title" contentEditable="true">Herma</span>
+          </div>
           {loading && <div className="loading">Loading...</div>}
           <form className="chat-form" onSubmit={handleSubmit}>
             <div className="input-container">
               <input
                 type="text"
-                placeholder="Ask Herma"
+                placeholder="Ask Herma Anything!"
                 value={chatMessage}
                 onChange={handleChatInput}
                 className="chat-input"
