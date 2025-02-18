@@ -10,6 +10,7 @@ declare global {
 
 interface Message {
   text: string;
+  htmlContent?: string;
   isUser: boolean;
 }
 
@@ -51,15 +52,24 @@ const Home: React.FC = () => {
     setMessages(prevMessages => {
       const lastMessage = prevMessages[prevMessages.length - 1];
       if (lastMessage && !lastMessage.isUser) {
-        // Update existing bot message
-        const updatedMessage = {
+        // Update existing bot message by just concatenating the raw text
+        // Then apply markdown to the entire message
+        const updatedText = lastMessage.text + chunk;
+        return [
+          ...prevMessages.slice(0, -1),
+          {
           ...lastMessage,
-          text: marked(lastMessage.text + chunk)
-        };
-        return [...prevMessages.slice(0, -1), updatedMessage];
+            text: updatedText,
+            htmlContent: marked(updatedText) // Store the HTML separately
+          }
+        ];
       } else {
         // Create new bot message
-        return [...prevMessages, { text: marked(chunk), isUser: false }];
+        return [...prevMessages, {
+          text: chunk,
+          htmlContent: marked(chunk),
+          isUser: false
+        }];
       }
     });
   };
@@ -263,12 +273,11 @@ const Home: React.FC = () => {
         setLoading(false);
       }
     };
-
   return (
     <div className="container">
       <div className="sidebar">
         <div className="logo-container">
-        <h2>Hermetic</h2>
+        <h2>Herma</h2>
           <img src="boots.jpeg" alt="Logo" className="logo" />
         </div>
         <div className="files-section">
@@ -301,7 +310,7 @@ const Home: React.FC = () => {
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
                   </svg>
                 )}
-                <span className="file-item-text" contentEditable="true">{filename}</span>
+                {filename}
                 <button
                   className="delete-button"
                   onClick={(e) => handleDeleteFile(filename, e)}
@@ -323,7 +332,17 @@ const Home: React.FC = () => {
       </div>
       {hasStarted ? (
         <div className="chat-container">
-                      <form className="chatting-form" onSubmit={handleSubmit}>
+          <div className="message-display">
+            {messages.map((msg, index) => (
+              <div
+                key={index}
+                className={`message ${msg.isUser ? "user-message" : "bot-message"}`}
+                dangerouslySetInnerHTML={{ __html: msg.isUser ? msg.text : (msg.htmlContent || '') }}
+                />
+            ))}
+            <div ref={messageEndRef} /> {/* Reference for auto-scrolling */}
+          </div>
+          <form className="chat-form" onSubmit={handleSubmit}>
             <div className="input-container">
               <input
                 type="text"
@@ -369,24 +388,6 @@ const Home: React.FC = () => {
               </div>
             </div>
           </form>
-          <div className="message-display">
-            {messages.map((msg, index) => (
-              <div
-                key={index}
-                className={`message ${
-                  msg.isUser ? "user-message" : "bot-message"
-                }`}
-              >
-                {!msg.isUser && (
-                  <span className="bot-pfp"> 
-                    <img src="boots.jpeg" alt="Logo" className="bot-logo" />
-                  </span>
-                )}
-                <p className="message-text">{msg.text}</p>
-              </div>
-            ))}
-            <div ref={messageEndRef} /> {/* Reference for auto-scrolling */}
-          </div>
         </div>
       ) : (
         <div className="centered-start">
@@ -399,7 +400,7 @@ const Home: React.FC = () => {
             <div className="input-container">
               <input
                 type="text"
-                placeholder="Ask Herma"
+                placeholder="Ask Herma Anything!"
                 value={chatMessage}
                 onChange={handleChatInput}
                 className="chat-input"
