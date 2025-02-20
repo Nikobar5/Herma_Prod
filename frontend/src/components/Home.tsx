@@ -278,7 +278,7 @@ const Home: React.FC = () => {
       <div className="sidebar">
         <div className="logo-container">
         <h2>Herma</h2>
-          <img src="boots.jpeg" alt="Logo" className="logo" />
+          <img src="Herma.jpeg" alt="Logo" className="logo" />
         </div>
         <div className="files-section">
           <h3>Uploaded Files</h3>
@@ -330,29 +330,92 @@ const Home: React.FC = () => {
           </ul>
         </div>
       </div>
-      {hasStarted ? (
-        <div className="chat-container">
+      <div className="center">
+        {hasStarted ? (
+         <div className="chat-container">
           <div className="message-display">
             {messages.map((msg, index) => (
-              <div
-                key={index}
-                className={`message ${msg.isUser ? "user-message" : "bot-message"}`}
-                dangerouslySetInnerHTML={{ __html: msg.isUser ? msg.text : (msg.htmlContent || '') }}
-                />
+              msg.isUser ? (
+                <div key={index} className="message user-message">
+                  <div dangerouslySetInnerHTML={{ __html: msg.text }} />
+                </div>
+              ) : (
+                <div key={index} className="bot-message-container">
+                  <div className="bot-pfp">
+                    <img src="boots.jpeg" alt="Bot" className="bot-logo" />
+                  </div>
+                  <div className="message bot-message">
+                    <div dangerouslySetInnerHTML={{ __html: msg.htmlContent || '' }} />
+                  </div>
+                </div>
+              )
             ))}
-            <div ref={messageEndRef} /> {/* Reference for auto-scrolling */}
+            <div ref={messageEndRef} />
           </div>
-          <form className="chat-form" onSubmit={handleSubmit}>
-            <div className="input-container">
-              <input
-                type="text"
-                placeholder="Ask Herma"
-                value={chatMessage}
-                onChange={handleChatInput}
-                className="chat-input"
-                disabled={loading || isUploading}
-              />
-              <div>
+            <form className="chat-form" onSubmit={handleSubmit}>
+              <div className="input-container">
+                <input
+                  type="text"
+                  placeholder="Ask Herma"
+                  value={chatMessage}
+                  onChange={handleChatInput}
+                  className="chat-input"
+                  disabled={loading || isUploading}
+                />
+                <div>
+                  <label className="upload-button">
+                    <input
+                      type="file"
+                      onChange={handleFileUpload}
+                      accept=".pdf,.txt,.md,.docx,.pptx,.xlsx,.csv,.json,.png,.jpg,.jpeg,.gif"
+                      style={{ display: "none" }}
+                    />
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                      width="25"
+                      height="25"
+                    >
+                      <path d="M12 2l4 4h-3v9h-2V6H8l4-4zM4 22v-7h2v5h12v-5h2v7H4z" />
+                    </svg>
+                  </label>
+                  <button
+                    type="submit"
+                    className="submit-button"
+                    disabled={loading || isUploading}
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                      width="25"
+                      height="25"
+                    >
+                      <path d="M2 21l21-9L2 3v7l15 2-15 2v7z" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        ) : (
+          <div className="centered-start">
+            <div className="chat-header">
+              <img src="Herma.jpeg" alt="Logo-Center" className="logo-Center" />
+              <span className="center-title" contentEditable="true">Herma</span>
+            </div>
+            {loading && <div className="loading">Loading...</div>}
+            <form className="chat-form-centered" onSubmit={handleSubmit}>
+              <div className="input-container">
+                <input
+                  type="text"
+                  placeholder="Ask Herma Anything!"
+                  value={chatMessage}
+                  onChange={handleChatInput}
+                  className="chat-input"
+                  disabled={loading || isUploading}
+                />
                 <label className="upload-button">
                   <input
                     type="file"
@@ -386,62 +449,10 @@ const Home: React.FC = () => {
                   </svg>
                 </button>
               </div>
-            </div>
-          </form>
-        </div>
-      ) : (
-        <div className="centered-start">
-          <div className="chat-header">
-            <img src="Herma.jpeg" alt="Logo-Center" className="logo-Center" />
-            <span className="center-title" contentEditable="true">Herma</span>
+            </form>
           </div>
-          {loading && <div className="loading">Loading...</div>}
-          <form className="chat-form" onSubmit={handleSubmit}>
-            <div className="input-container">
-              <input
-                type="text"
-                placeholder="Ask Herma Anything!"
-                value={chatMessage}
-                onChange={handleChatInput}
-                className="chat-input"
-                disabled={loading || isUploading}
-              />
-              <label className="upload-button">
-                <input
-                  type="file"
-                  onChange={handleFileUpload}
-                  accept=".pdf,.txt,.md,.docx,.pptx,.xlsx,.csv,.json,.png,.jpg,.jpeg,.gif"
-                  style={{ display: "none" }}
-                />
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                  width="20"
-                  height="20"
-                >
-                  <path d="M12 2l4 4h-3v9h-2V6H8l4-4zM4 22v-7h2v5h12v-5h2v7H4z" />
-                </svg>
-              </label>
-              <button
-                type="submit"
-                className="submit-button"
-                disabled={loading || isUploading}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                  width="20"
-                  height="20"
-                >
-                  <path d="M2 21l21-9L2 3v7l15 2-15 2v7z" />
-                </svg>
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };
