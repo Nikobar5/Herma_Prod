@@ -1,3 +1,4 @@
+// Home.tsx
 import React, { useState, useRef, useEffect } from "react";
 const { ipcRenderer } = window.require('electron');
 import {marked} from 'marked';
@@ -27,6 +28,7 @@ const Home: React.FC = () => {
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([]);
   const [clickTimers, setClickTimers] = useState<ClickTimer>({});
   const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   const messageEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -48,237 +50,144 @@ const Home: React.FC = () => {
   };
 
   useEffect(() => {
-  const messageHandler = (_event: any, chunk: string) => {
-    setMessages(prevMessages => {
-      const lastMessage = prevMessages[prevMessages.length - 1];
-      if (lastMessage && !lastMessage.isUser) {
-        // Update existing bot message by just concatenating the raw text
-        // Then apply markdown to the entire message
-        const updatedText = lastMessage.text + chunk;
-        return [
-          ...prevMessages.slice(0, -1),
-          {
-          ...lastMessage,
-            text: updatedText,
-            htmlContent: marked(updatedText) // Store the HTML separately
-          }
-        ];
-      } else {
-        // Create new bot message
-        return [...prevMessages, {
-          text: chunk,
-          htmlContent: marked(chunk),
-          isUser: false
-        }];
-      }
-    });
-  };
+    const messageHandler = (_event: any, chunk: string) => {
+      setMessages(prevMessages => {
+        const lastMessage = prevMessages[prevMessages.length - 1];
+        if (lastMessage && !lastMessage.isUser) {
+          const updatedText = lastMessage.text + chunk;
+          return [
+            ...prevMessages.slice(0, -1),
+            {
+              ...lastMessage,
+              text: updatedText,
+              htmlContent: marked(updatedText)
+            }
+          ];
+        } else {
+          return [...prevMessages, {
+            text: chunk,
+            htmlContent: marked(chunk),
+            isUser: false
+          }];
+        }
+      });
+    };
 
-  ipcRenderer.on('chat-response', messageHandler);
-
-  // Cleanup listener on unmount
-  return () => {
-    ipcRenderer.removeListener('chat-response', messageHandler);
-  };
+    ipcRenderer.on('chat-response', messageHandler);
+    return () => {
+      ipcRenderer.removeListener('chat-response', messageHandler);
+    };
   }, []);
 
-    // Handle file upload
-    const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      if (!file) return;
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-      setIsUploading(true);
+    setIsUploading(true);
+    try {
+      const buffer = await file.arrayBuffer();
+      await ipcRenderer.invoke('upload-file', {
+        filename: file.name,
+        data: Buffer.from(buffer)
+      });
+
+      const files = await ipcRenderer.invoke('get-files');
+      setUploadedFiles(files);
+
+      setSelectedFiles(prev => [...prev, file.name]);
+      await ipcRenderer.invoke('select-files', {
+        filenames: [...selectedFiles, file.name]
+      });
+    } catch (error) {
+      console.error("Error uploading file:", error);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const fetchAndSelectFiles = async () => {
+    try {
+      const files = await ipcRenderer.invoke('get-files');
+      setUploadedFiles(files);
+    } catch (error) {
+      console.error("Error fetching files:", error);
+    }
+  };
+
+  const handleFileClick = async (filename: string) => {
+    const now = Date.now();
+    const lastClick = clickTimers[filename] || 0;
+    const isDoubleClick = now - lastClick < 300;
+
+    setClickTimers(prev => ({
+      ...prev,
+      [filename]: now
+    }));
+
+    if (isDoubleClick) {
       try {
-        const buffer = await file.arrayBuffer();
-        await ipcRenderer.invoke('upload-file', {
-          filename: file.name,
-          data: Buffer.from(buffer)
-        });
-
-        // Get updated file list
-        const files = await ipcRenderer.invoke('get-files');
-        setUploadedFiles(files);
-
-        // Automatically select the new file
-        setSelectedFiles(prev => [...prev, file.name]);
-        await ipcRenderer.invoke('select-files', {
-          filenames: [...selectedFiles, file.name]
-        });
+        await ipcRenderer.invoke('open-file', { filename });
       } catch (error) {
-        console.error("Error uploading file:", error);
-      } finally {
-        setIsUploading(false);
+        console.error("Error opening file:", error);
       }
-    };
+    } else {
+      const isSelected = selectedFiles.includes(filename);
+      const newSelectedFiles = isSelected
+        ? selectedFiles.filter(f => f !== filename)
+        : [...selectedFiles, filename];
 
-    // Fetch files and select them
-    const fetchAndSelectFiles = async () => {
+      setSelectedFiles(newSelectedFiles);
+      await ipcRenderer.invoke('select-files', { filenames: newSelectedFiles });
+    }
+  };
+
+  const handleDeleteFile = async (filename: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    if (window.confirm(`Are you sure you want to delete ${filename}?`)) {
       try {
-        const files = await ipcRenderer.invoke('get-files');
-        setUploadedFiles(files);
+        await ipcRenderer.invoke('delete-file', { filename });
+        await fetchAndSelectFiles();
       } catch (error) {
-        console.error("Error fetching files:", error);
+        console.error("Error deleting file:", error);
       }
-    };
+    }
+  };
 
-    // Handle file click
-    const handleFileClick = async (filename: string) => {
-      const now = Date.now();
-      const lastClick = clickTimers[filename] || 0;
-      const isDoubleClick = now - lastClick < 300;
-
-      setClickTimers(prev => ({
-        ...prev,
-        [filename]: now
-      }));
-
-      if (isDoubleClick) {
-        // Open file on double click
-        try {
-          await ipcRenderer.invoke('open-file', { filename });
-        } catch (error) {
-          console.error("Error opening file:", error);
-        }
-      } else {
-        // Toggle selection on single click
-        const isSelected = selectedFiles.includes(filename);
-        const newSelectedFiles = isSelected
-          ? selectedFiles.filter(f => f !== filename)
-          : [...selectedFiles, filename];
-
-        setSelectedFiles(newSelectedFiles);
-        await ipcRenderer.invoke('select-files', { filenames: newSelectedFiles });
-      }
-    };
-
-    const handleDeleteFile = async (filename: string, e: React.MouseEvent) => {
-      e.stopPropagation();
-
-      if (window.confirm(`Are you sure you want to delete ${filename}?`)) {
-        try {
-          await ipcRenderer.invoke('delete-file', { filename });
-          await fetchAndSelectFiles();
-        } catch (error) {
-          console.error("Error deleting file:", error);
-        }
-      }
-    };
-
-  // Fetch uploaded files upon setup (and also select-files for context)
   useEffect(() => {
     fetchAndSelectFiles();
   }, []);
 
-//   const handleSubmit = async (event: React.FormEvent) => {
-//     event.preventDefault();
-//
-//     if (!chatMessage.trim()) return;
-//
-//     const currentMessage = chatMessage; // Store chatMessage locally
-//
-//     // Add user message to the message list
-//     const userMessage: Message = { text: currentMessage, isUser: true };
-//     setMessages((prevMessages) => [...prevMessages, userMessage]);
-//     setLoading(true);
-//     setChatMessage("");
-//
-//     const eventSource = new EventSource(`http://127.0.0.1:5001/chat?message=${encodeURIComponent(currentMessage)}`);
-//
-//     eventSource.onmessage = (event) => {
-//         const chunk = event.data;
-//         console.log("Received chunk:", chunk);
-//         setMessages((prevMessages) => {
-//             const lastMessage = prevMessages[prevMessages.length - 1];
-//             console.log("Set last message");
-//             if (lastMessage && !lastMessage.isUser) {
-//                 lastMessage.text += chunk;
-//                 console.log("Concatenated " + chunk);
-//                 return [...prevMessages.slice(0, -1), lastMessage];
-//             } else {
-//                 return [...prevMessages, { text: chunk, isUser: false }];
-//             }
-//         });
-//     };
-//
-//     eventSource.onerror = () => {
-//         console.error("EventSource error:", event);
-//         console.error("Ready state:", eventSource.readyState);
-//         eventSource.close();
-//         setLoading(false);
-//     };
-//   };
-//     const handleSubmit = async (event: React.FormEvent) => {
-//       event.preventDefault();
-//       if (!chatMessage.trim()) return;
-//
-//       const currentMessage = chatMessage;
-//       setMessages(prevMessages => [...prevMessages, { text: currentMessage, isUser: true }]);
-//       setLoading(true);
-//       setChatMessage("");
-//
-//       try {
-//         await ipcRenderer.invoke('start-chat', { message: currentMessage });
-//       } catch (error) {
-//         console.error("Error sending message:", error);
-//       } finally {
-//         setLoading(false);
-//       }
-//     };
-//
-//     // Add this useEffect for chat streaming:
-//     useEffect(() => {
-//       const messageHandler = (_event: any, data: string) => {
-//         setMessages(prevMessages => {
-//           const lastMessage = prevMessages[prevMessages.length - 1];
-//           if (lastMessage && !lastMessage.isUser) {
-//             lastMessage.text += data;
-//             return [...prevMessages.slice(0, -1), lastMessage];
-//           } else {
-//             return [...prevMessages, { text: data, isUser: false }];
-//           }
-//         });
-//       };
-//
-//       ipcRenderer.on('chat-response', messageHandler);
-//       return () => {
-//         ipcRenderer.removeListener('chat-response', messageHandler);
-//       };
-//     }, []);
-    const handleSubmit = async (event: React.FormEvent) => {
-      event.preventDefault();
-      if (!chatMessage.trim()) return;
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!chatMessage.trim()) return;
 
-      const currentMessage = chatMessage;
-      // Add user message to the list (no need for markdown on user messages)
-      const userMessage: Message = { text: currentMessage, isUser: true };
-      setMessages(prevMessages => [...prevMessages, userMessage]);
-      setLoading(true);
-      setChatMessage("");
-      setHasStarted(true);
+    const currentMessage = chatMessage;
+    const userMessage: Message = { text: currentMessage, isUser: true };
+    setMessages(prevMessages => [...prevMessages, userMessage]);
+    setLoading(true);
+    setChatMessage("");
+    setHasStarted(true);
 
-      try {
-        console.log("Attempting to send message:", currentMessage);
-        await ipcRenderer.invoke('start-chat', { message: currentMessage });
-        // Note: We don't need to handle the bot message here anymore because
-        // it's handled by the useEffect listener we added, which already
-        // applies marked() to the chunks as they come in
-      } catch (error) {
-        console.error("Error sending message:", error);
-        // Optionally add an error message to the chat
-        setMessages(prevMessages => [
-          ...prevMessages,
-          { text: marked("❌ Error: Failed to send message"), isUser: false }
-        ]);
-      } finally {
-        setLoading(false);
-      }
-    };
+    try {
+      console.log("Attempting to send message:", currentMessage);
+      await ipcRenderer.invoke('start-chat', { message: currentMessage });
+    } catch (error) {
+      console.error("Error sending message:", error);
+      setMessages(prevMessages => [
+        ...prevMessages,
+        { text: marked("❌ Error: Failed to send message"), isUser: false }
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="container">
-      <div className="sidebar">
+      <div className={`sidebar ${isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
         <div className="logo-container">
-        <h2>Herma</h2>
-          <img src="Herma.jpeg" alt="Logo" className="logo" />
+          <h2>Herma</h2>
         </div>
         <div className="files-section">
           <h3>Uploaded Files</h3>
@@ -289,8 +198,8 @@ const Home: React.FC = () => {
                 className={`file-item ${selectedFiles.includes(filename) ? 'file-selected' : ''}`}
                 onClick={() => handleFileClick(filename)}
                 style={{
-                    cursor: "pointer",
-                    userSelect: "none"
+                  cursor: "pointer",
+                  userSelect: "none"
                 }}
               >
                 {isImage(filename) ? (
@@ -330,28 +239,57 @@ const Home: React.FC = () => {
           </ul>
         </div>
       </div>
+
+      <div className="sidebar-controls">
+        <button
+          className="sidebar-toggle"
+          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            width="24"
+            height="24"
+          >
+            <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" />
+          </svg>
+        </button>
+        <button className="new-chat-button">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            width="24"
+            height="24"
+          >
+            <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+          </svg>
+        </button>
+      </div>
+
       <div className="center">
         {hasStarted ? (
-         <div className="chat-container">
-          <div className="message-display">
-            {messages.map((msg, index) => (
-              msg.isUser ? (
-                <div key={index} className="message user-message">
-                  <div className="rich-text" dangerouslySetInnerHTML={{ __html: msg.text }} />
-                </div>
-              ) : (
-                <div key={index} className="bot-message-container">
-                  <div className="bot-pfp">
-                    <img src="boots.jpeg" alt="Bot" className="bot-logo" />
+          <div className="chat-container">
+            <div className="message-display">
+              {messages.map((msg, index) => (
+                msg.isUser ? (
+                  <div key={index} className="message user-message">
+                    <div className="rich-text" dangerouslySetInnerHTML={{ __html: msg.text }} />
                   </div>
-                  <div className="message bot-message">
-                    <div className="rich-text" dangerouslySetInnerHTML={{ __html: msg.htmlContent || '' }} />
+                ) : (
+                  <div key={index} className="bot-message-container">
+                    <div className="bot-pfp">
+                      <img src="boots.jpeg" alt="Bot" className="bot-logo" />
+                    </div>
+                    <div className="message bot-message">
+                      <div className="rich-text" dangerouslySetInnerHTML={{ __html: msg.htmlContent || '' }} />
+                    </div>
                   </div>
-                </div>
-              )
-            ))}
-            <div ref={messageEndRef} />
-          </div>
+                )
+              ))}
+              <div ref={messageEndRef} />
+            </div>
             <form className="chat-form" onSubmit={handleSubmit}>
               <div className="input-container">
                 <input
