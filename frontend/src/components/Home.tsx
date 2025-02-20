@@ -47,7 +47,7 @@ const Home: React.FC = () => {
     return /\.(jpg|jpeg|png|gif)$/i.test(filename);
   };
 
-useEffect(() => {
+  useEffect(() => {
   const messageHandler = (_event: any, chunk: string) => {
     setMessages(prevMessages => {
       const lastMessage = prevMessages[prevMessages.length - 1];
@@ -58,7 +58,7 @@ useEffect(() => {
         return [
           ...prevMessages.slice(0, -1),
           {
-            ...lastMessage,
+          ...lastMessage,
             text: updatedText,
             htmlContent: marked(updatedText) // Store the HTML separately
           }
@@ -76,10 +76,11 @@ useEffect(() => {
 
   ipcRenderer.on('chat-response', messageHandler);
 
+  // Cleanup listener on unmount
   return () => {
     ipcRenderer.removeListener('chat-response', messageHandler);
   };
-}, []);
+  }, []);
 
     // Handle file upload
     const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -168,6 +169,81 @@ useEffect(() => {
     fetchAndSelectFiles();
   }, []);
 
+//   const handleSubmit = async (event: React.FormEvent) => {
+//     event.preventDefault();
+//
+//     if (!chatMessage.trim()) return;
+//
+//     const currentMessage = chatMessage; // Store chatMessage locally
+//
+//     // Add user message to the message list
+//     const userMessage: Message = { text: currentMessage, isUser: true };
+//     setMessages((prevMessages) => [...prevMessages, userMessage]);
+//     setLoading(true);
+//     setChatMessage("");
+//
+//     const eventSource = new EventSource(`http://127.0.0.1:5001/chat?message=${encodeURIComponent(currentMessage)}`);
+//
+//     eventSource.onmessage = (event) => {
+//         const chunk = event.data;
+//         console.log("Received chunk:", chunk);
+//         setMessages((prevMessages) => {
+//             const lastMessage = prevMessages[prevMessages.length - 1];
+//             console.log("Set last message");
+//             if (lastMessage && !lastMessage.isUser) {
+//                 lastMessage.text += chunk;
+//                 console.log("Concatenated " + chunk);
+//                 return [...prevMessages.slice(0, -1), lastMessage];
+//             } else {
+//                 return [...prevMessages, { text: chunk, isUser: false }];
+//             }
+//         });
+//     };
+//
+//     eventSource.onerror = () => {
+//         console.error("EventSource error:", event);
+//         console.error("Ready state:", eventSource.readyState);
+//         eventSource.close();
+//         setLoading(false);
+//     };
+//   };
+//     const handleSubmit = async (event: React.FormEvent) => {
+//       event.preventDefault();
+//       if (!chatMessage.trim()) return;
+//
+//       const currentMessage = chatMessage;
+//       setMessages(prevMessages => [...prevMessages, { text: currentMessage, isUser: true }]);
+//       setLoading(true);
+//       setChatMessage("");
+//
+//       try {
+//         await ipcRenderer.invoke('start-chat', { message: currentMessage });
+//       } catch (error) {
+//         console.error("Error sending message:", error);
+//       } finally {
+//         setLoading(false);
+//       }
+//     };
+//
+//     // Add this useEffect for chat streaming:
+//     useEffect(() => {
+//       const messageHandler = (_event: any, data: string) => {
+//         setMessages(prevMessages => {
+//           const lastMessage = prevMessages[prevMessages.length - 1];
+//           if (lastMessage && !lastMessage.isUser) {
+//             lastMessage.text += data;
+//             return [...prevMessages.slice(0, -1), lastMessage];
+//           } else {
+//             return [...prevMessages, { text: data, isUser: false }];
+//           }
+//         });
+//       };
+//
+//       ipcRenderer.on('chat-response', messageHandler);
+//       return () => {
+//         ipcRenderer.removeListener('chat-response', messageHandler);
+//       };
+//     }, []);
     const handleSubmit = async (event: React.FormEvent) => {
       event.preventDefault();
       if (!chatMessage.trim()) return;
@@ -201,8 +277,8 @@ useEffect(() => {
     <div className="container">
       <div className="sidebar">
         <div className="logo-container">
-          <img src="logo.png" alt="Logo" className="logo" />
-          <h2>Hermetic</h2>
+        <h2>Herma</h2>
+          <img src="Herma.jpeg" alt="Logo" className="logo" />
         </div>
         <div className="files-section">
           <h3>Uploaded Files</h3>
@@ -254,29 +330,92 @@ useEffect(() => {
           </ul>
         </div>
       </div>
-      {hasStarted ? (
-        <div className="chat-container">
+      <div className="center">
+        {hasStarted ? (
+         <div className="chat-container">
           <div className="message-display">
             {messages.map((msg, index) => (
-              <div
-                key={index}
-                className={`message ${msg.isUser ? "user-message" : "bot-message"}`}
-                dangerouslySetInnerHTML={{ __html: msg.isUser ? msg.text : (msg.htmlContent || '') }}
-                />
+              msg.isUser ? (
+                <div key={index} className="message user-message">
+                  <div className="rich-text" dangerouslySetInnerHTML={{ __html: msg.text }} />
+                </div>
+              ) : (
+                <div key={index} className="bot-message-container">
+                  <div className="bot-pfp">
+                    <img src="boots.jpeg" alt="Bot" className="bot-logo" />
+                  </div>
+                  <div className="message bot-message">
+                    <div className="rich-text" dangerouslySetInnerHTML={{ __html: msg.htmlContent || '' }} />
+                  </div>
+                </div>
+              )
             ))}
-            <div ref={messageEndRef} /> {/* Reference for auto-scrolling */}
+            <div ref={messageEndRef} />
           </div>
-          <form className="chat-form" onSubmit={handleSubmit}>
-            <div className="input-container">
-              <input
-                type="text"
-                placeholder="Ask Herma"
-                value={chatMessage}
-                onChange={handleChatInput}
-                className="chat-input"
-                disabled={loading || isUploading}
-              />
-              <div>
+            <form className="chat-form" onSubmit={handleSubmit}>
+              <div className="input-container">
+                <input
+                  type="text"
+                  placeholder="Ask Herma"
+                  value={chatMessage}
+                  onChange={handleChatInput}
+                  className="chat-input"
+                  disabled={loading || isUploading}
+                />
+                <div>
+                  <label className="upload-button">
+                    <input
+                      type="file"
+                      onChange={handleFileUpload}
+                      accept=".pdf,.txt,.md,.docx,.pptx,.xlsx,.csv,.json,.png,.jpg,.jpeg,.gif"
+                      style={{ display: "none" }}
+                    />
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                      width="25"
+                      height="25"
+                    >
+                      <path d="M12 2l4 4h-3v9h-2V6H8l4-4zM4 22v-7h2v5h12v-5h2v7H4z" />
+                    </svg>
+                  </label>
+                  <button
+                    type="submit"
+                    className="submit-button"
+                    disabled={loading || isUploading}
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                      width="25"
+                      height="25"
+                    >
+                      <path d="M2 21l21-9L2 3v7l15 2-15 2v7z" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        ) : (
+          <div className="centered-start">
+            <div className="chat-header">
+              <img src="Herma.jpeg" alt="Logo-Center" className="logo-Center" />
+              <span className="center-title" contentEditable="true">Herma</span>
+            </div>
+            {loading && <div className="loading">Loading...</div>}
+            <form className="chat-form-centered" onSubmit={handleSubmit}>
+              <div className="input-container">
+                <input
+                  type="text"
+                  placeholder="Ask Herma Anything!"
+                  value={chatMessage}
+                  onChange={handleChatInput}
+                  className="chat-input"
+                  disabled={loading || isUploading}
+                />
                 <label className="upload-button">
                   <input
                     type="file"
@@ -310,59 +449,10 @@ useEffect(() => {
                   </svg>
                 </button>
               </div>
-            </div>
-          </form>
-        </div>
-      ) : (
-        <div className="centered-start">
-          <div className="chat-header">Herma</div>
-          {loading && <div className="loading">Loading...</div>}
-          <form className="chat-form" onSubmit={handleSubmit}>
-            <div className="input-container">
-              <input
-                type="text"
-                placeholder="Ask Herma"
-                value={chatMessage}
-                onChange={handleChatInput}
-                className="chat-input"
-                disabled={loading || isUploading}
-              />
-              <label className="upload-button">
-                <input
-                  type="file"
-                  onChange={handleFileUpload}
-                  accept=".pdf,.txt,.md,.docx,.pptx,.xlsx,.csv,.json,.png,.jpg,.jpeg,.gif"
-                  style={{ display: "none" }}
-                />
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                  width="20"
-                  height="20"
-                >
-                  <path d="M12 2l4 4h-3v9h-2V6H8l4-4zM4 22v-7h2v5h12v-5h2v7H4z" />
-                </svg>
-              </label>
-              <button
-                type="submit"
-                className="submit-button"
-                disabled={loading || isUploading}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                  width="20"
-                  height="20"
-                >
-                  <path d="M2 21l21-9L2 3v7l15 2-15 2v7z" />
-                </svg>
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+            </form>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

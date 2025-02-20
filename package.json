@@ -14,7 +14,7 @@
     "clean": "rimraf electron/dist frontend/dist"
   },
   "dependencies": {
-    "@types/marked": "^5.0.2",
+    "@types/marked": "^6.0.0",
     "marked": "^15.0.7",
     "python-shell": "latest",
     "react": "^18.3.1",
