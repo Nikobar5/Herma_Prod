@@ -335,21 +335,12 @@ const Home: React.FC = () => {
          <div className="chat-container">
           <div className="message-display">
             {messages.map((msg, index) => (
-              msg.isUser ? (
-                <div key={index} className="message user-message">
-                  <div dangerouslySetInnerHTML={{ __html: msg.text }} />
-                </div>
-              ) : (
-                <div key={index} className="bot-message-container">
-                  <div className="bot-pfp">
-                    <img src="boots.jpeg" alt="Bot" className="bot-logo" />
-                  </div>
-                  <div className="message bot-message">
-                    <div dangerouslySetInnerHTML={{ __html: msg.htmlContent || '' }} />
-                  </div>
-                </div>
-              )
-            ))}
+                <div
+                  key={index}
+                  className={`message ${msg.isUser ? "user-message" : "bot-message"}`}
+                  dangerouslySetInnerHTML={{ __html: msg.isUser ? msg.text : (msg.htmlContent || '') }}
+                  />
+              ))}
             <div ref={messageEndRef} />
           </div>
             <form className="chat-form" onSubmit={handleSubmit}>

@@ -276,11 +276,9 @@ body {
 .bot-message-container {
   display: flex;
   width: 100%;
-  align-items: flex-start;
 }
 
 .bot-message {
-  align-self: flex-start;  /* Align to left */
   flex-direction: column;
   position: relative;
   font-size: var(--font-size);
