@@ -185,89 +185,90 @@ const Home: React.FC = () => {
 
   return (
     <div className="container">
-      <div className={`sidebar ${isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
-        <div className="logo-container">
-          <h2>Herma</h2>
-        </div>
-        <div className="files-section">
-          <h3>Uploaded Files</h3>
-          <ul className="files-list">
-            {uploadedFiles.map((filename, index) => (
-              <li
-                key={index}
-                className={`file-item ${selectedFiles.includes(filename) ? 'file-selected' : ''}`}
-                onClick={() => handleFileClick(filename)}
-                style={{
-                  cursor: "pointer",
-                  userSelect: "none"
-                }}
-              >
-                {isImage(filename) ? (
-                  <img
-                    src={`file://${filename}`}
-                    alt={filename}
-                    className="file-thumbnail"
-                  />
-                ) : (
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    width="16"
-                    height="16"
-                  >
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
-                  </svg>
-                )}
-                {filename}
-                <button
-                  className="delete-button"
-                  onClick={(e) => handleDeleteFile(filename, e)}
+      <div className="sidebar-container">
+        <div className={`sidebar ${isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
+          <div className="logo-container">
+            <h2>Herma</h2>
+          </div>
+          <div className="files-section">
+            <h3>Uploaded Files</h3>
+            <ul className="files-list">
+              {uploadedFiles.map((filename, index) => (
+                <li
+                  key={index}
+                  className={`file-item ${selectedFiles.includes(filename) ? 'file-selected' : ''}`}
+                  onClick={() => handleFileClick(filename)}
+                  style={{
+                    cursor: "pointer",
+                    userSelect: "none"
+                  }}
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    width="16"
-                    height="16"
+                  {isImage(filename) ? (
+                    <img
+                      src={`file://${filename}`}
+                      alt={filename}
+                      className="file-thumbnail"
+                    />
+                  ) : (
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                      width="16"
+                      height="16"
+                    >
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
+                    </svg>
+                  )}
+                  {filename}
+                  <button
+                    className="delete-button"
+                    onClick={(e) => handleDeleteFile(filename, e)}
                   >
-                    <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
-                  </svg>
-                </button>
-              </li>
-            ))}
-          </ul>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                      width="16"
+                      height="16"
+                    >
+                      <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
+                    </svg>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+
+        <div className="sidebar-controls">
+          <button
+            className="sidebar-toggle"
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              width="24"
+              height="24"
+            >
+              <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" />
+            </svg>
+          </button>
+          <button className="new-chat-button">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              width="24"
+              height="24"
+            >
+              <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+            </svg>
+          </button>
         </div>
       </div>
-
-      <div className="sidebar-controls">
-        <button
-          className="sidebar-toggle"
-          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            width="24"
-            height="24"
-          >
-            <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" />
-          </svg>
-        </button>
-        <button className="new-chat-button">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            width="24"
-            height="24"
-          >
-            <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
-          </svg>
-        </button>
-      </div>
-
       <div className="center">
         {hasStarted ? (
           <div className="chat-container">
