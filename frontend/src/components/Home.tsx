@@ -185,7 +185,7 @@ const Home: React.FC = () => {
 
   return (
     <div className="container">
-      <div className='sidebar-container'>
+      <div className="sidebar-container">
         <div className={`sidebar ${isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
           <div className="logo-container">
             <h2>Herma</h2>
@@ -301,8 +301,7 @@ const Home: React.FC = () => {
                   className="chat-input"
                   disabled={loading || isUploading}
                 />
-              </div>
-              <div>
+                <div>
                   <label className="upload-button">
                     <input
                       type="file"
@@ -336,7 +335,7 @@ const Home: React.FC = () => {
                     </svg>
                   </button>
                 </div>
-
+              </div>
             </form>
           </div>
         ) : (
