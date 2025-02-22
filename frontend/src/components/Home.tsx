@@ -185,7 +185,7 @@ const Home: React.FC = () => {
 
   return (
     <div className="container">
-      <div className="sidebar-container">
+      <div className='sidebar-container'>
         <div className={`sidebar ${isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
           <div className="logo-container">
             <h2>Herma</h2>
@@ -292,50 +292,55 @@ const Home: React.FC = () => {
               <div ref={messageEndRef} />
             </div>
             <form className="chat-form" onSubmit={handleSubmit}>
-              <div className="input-container">
-                <input
-                  type="text"
-                  placeholder="Ask Herma"
-                  value={chatMessage}
-                  onChange={handleChatInput}
-                  className="chat-input"
-                  disabled={loading || isUploading}
-                />
-                <div>
-                  <label className="upload-button">
-                    <input
-                      type="file"
-                      onChange={handleFileUpload}
-                      accept=".pdf,.txt,.md,.docx,.pptx,.xlsx,.csv,.json,.png,.jpg,.jpeg,.gif"
-                      style={{ display: "none" }}
-                    />
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 24 24"
-                      fill="currentColor"
-                      width="25"
-                      height="25"
-                    >
-                      <path d="M12 2l4 4h-3v9h-2V6H8l4-4zM4 22v-7h2v5h12v-5h2v7H4z" />
-                    </svg>
-                  </label>
-                  <button
-                    type="submit"
-                    className="submit-button"
+              <div className="input-bar-buttons">
+                <div className="input-container">
+                  <input
+                    type="text"
+                    placeholder="Ask Herma"
+                    value={chatMessage}
+                    onChange={handleChatInput}
+                    className="chat-input"
                     disabled={loading || isUploading}
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 24 24"
-                      fill="currentColor"
-                      width="25"
-                      height="25"
-                    >
-                      <path d="M2 21l21-9L2 3v7l15 2-15 2v7z" />
-                    </svg>
-                  </button>
+                  />
                 </div>
-              </div>
+                <div className="chat-buttons-container">
+                    <label className="upload-button">
+                      <input
+                        type="file"
+                        onChange={handleFileUpload}
+                        accept=".pdf,.txt,.md,.docx,.pptx,.xlsx,.csv,.json,.png,.jpg,.jpeg,.gif"
+                        style={{ display: "none" }}
+                      />
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                        width="25"
+                        height="25"
+                      >
+                        <path d="M12 2l4 4h-3v9h-2V6H8l4-4zM4 22v-7h2v5h12v-5h2v7H4z" />
+                      </svg>
+                    </label>
+                    <button
+                      type="submit"
+                      className="submit-button"
+                      disabled={loading || isUploading}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                        width="25"
+                        height="25"
+                      >
+                        <path d="M2 21l21-9L2 3v7l15 2-15 2v7z" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                <div className="accuracy-disclaimer">
+                  Herma isn't perfect. Double check important information.
+                </div>
             </form>
           </div>
         ) : (
@@ -355,7 +360,8 @@ const Home: React.FC = () => {
                   className="chat-input"
                   disabled={loading || isUploading}
                 />
-                <label className="upload-button">
+              </div>
+              <label className="upload-button">
                   <input
                     type="file"
                     onChange={handleFileUpload}
@@ -366,28 +372,28 @@ const Home: React.FC = () => {
                     xmlns="http://www.w3.org/2000/svg"
                     viewBox="0 0 24 24"
                     fill="currentColor"
-                    width="20"
-                    height="20"
+                    width="25"
+                    height="25"
                   >
                     <path d="M12 2l4 4h-3v9h-2V6H8l4-4zM4 22v-7h2v5h12v-5h2v7H4z" />
                   </svg>
-                </label>
-                <button
-                  type="submit"
-                  className="submit-button"
-                  disabled={loading || isUploading}
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    width="20"
-                    height="20"
+
+                  </label>
+                  <button
+                    type="submit"
+                    className="submit-button"
+                    disabled={loading || isUploading}
                   >
-                    <path d="M2 21l21-9L2 3v7l15 2-15 2v7z" />
-                  </svg>
-                </button>
-              </div>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                      width="25"
+                      height="25"
+                    >
+                      <path d="M2 21l21-9L2 3v7l15 2-15 2v7z" />
+                    </svg>
+                  </button>
             </form>
           </div>
         )}

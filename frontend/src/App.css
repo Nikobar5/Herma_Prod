@@ -1,4 +1,4 @@
-/* CSS Reset */
+/************* General ****************/
 *,
 *::before,
 *::after {
@@ -55,6 +55,7 @@
 body {
   font-family: var(--font);
   font-size: 14px;
+  line-height: 1.5;
   background-color: var(--primary-bg);
   color: var(--text-color);
   height: 100vh;
@@ -68,12 +69,15 @@ body {
   overflow: hidden;
   align-items: center;
 }
+/************* General ****************/
+
 
 /************* Sidebar ****************/
 .sidebar-container {
   position: relative;
   display: flex;
   height: 100vh;
+  transform: 0.3s ease, margin-left 0.3s ease;
   width: var(--sidebar-width);
   flex: 1;
 }
@@ -87,23 +91,23 @@ body {
   background-color: var(--secondary-bg);
   transition: transform 0.3s ease;
   z-index: 1000;
+  box-shadow: 0 0 50px rgba(0, 0, 0, 0.2);
 }
 
 .sidebar-closed {
-  transform: translateX(-100%);
+  transform: translateX(calc(-1*var(--sidebar-width)));
 }
-
 .sidebar-controls {
   position: absolute;
+  top: 2rem;
+  right: 4rem;
   display: flex;
-  flex-direction: row;
-  margin-top: 2rem;
+  flex-direction: column;
   gap: 0.5rem;
-  transform: translateX(-8rem);
-  z-index: 1001; /* Ensure it's above the sidebar */
+  z-index: 1100; /* Ensure it's above the sidebar */
   transition: transform 0.3s ease;
-  left: calc(100% + 0.5rem);
 }
+
 
 .sidebar-toggle,
 .new-chat-button {
@@ -127,25 +131,7 @@ body {
 /* When sidebar is closed, adjust the controls position */
 .sidebar-closed + .sidebar-controls {
   flex-direction: column;
-  transform: translateX(calc(-1 * var(--sidebar-width) - 0.5rem));
-}
-
-/* When sidebar is open, adjust the controls position 
-.sidebar-open + .sidebar-controls {
-  left: calc(var(--sidebar-width) + 1rem);
-} */
-
-.center {
-  flex: 3;
-  display: flex;
-  position: fixed;
-  left: 50vh;
-  width: 100vh;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  margin-left: var(--sidebar-width);
-  transition: margin-left 0.3s ease;
+  transform: translateX(calc(-1*var(--sidebar-width)));
 }
 
 /* Adjust center content when sidebar is closed */
@@ -207,6 +193,8 @@ body {
 .file-selected:hover {
   background-color: rgba(255, 255, 255, 0.25);
 }
+/************* Sidebar ****************/
+
 
 /************* Center Start ****************/
 .centered-start {
@@ -227,9 +215,10 @@ body {
 .chat-form-centered {
   width: 75vh;
   max-width: var(--chat-max-width);
-  background-color: var(--secondary-bg);
   border-radius: 20px;
-  padding: 1rem;
+  display: flex;
+  align-items: center;
+  flex: 1;
 }
 
 .logo-Center {
@@ -249,8 +238,19 @@ body {
   font-size: 1rem;
   text-align: center;
 }
+/************* Center Start ****************/
+
 
 /************* Chat ****************/
+.center {
+  flex: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: margin-left 0.3s ease;
+}
+
 .chat-container {
   flex: 3;
   display: flex;
@@ -276,6 +276,9 @@ body {
   display: flex;
   gap: 1rem;
   padding: 1rem;
+  font-family: 'Roboto', sans-serif;
+  font-weight: 500;
+  font-size: var(--font-size);
 }
 
 .user-message {
@@ -285,7 +288,6 @@ body {
   margin-left: auto;
   margin-top: 1rem;
   border-radius: 20px;
-  font-size: var(--font-size);
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   background-color: var(--secondary-bg);
   max-width: var(--message-max-width);
@@ -295,17 +297,14 @@ body {
   display: flex;
   width: 100%;
   align-items: flex-start;
-  max-width: var(--message-max-width);
 }
 
 .bot-message {
   align-self: flex-start;
   flex-direction: column;
   position: relative;
-  font-size: var(--font-size);
   margin-top: 1rem;
   width: 100%;
-  background-color: var(--primary-bg);
 }
 
 .bot-pfp {
@@ -323,21 +322,47 @@ body {
 
 .chat-form {
   position: fixed;
-  bottom: 0;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  flex: 1;
+  bottom: 0.75rem;
   margin-bottom: 8px;
-  width: 75vh;
+  width: 100%;
   max-width: var(--chat-max-width);
-  background-color: var(--secondary-bg);
-  border-radius: 20px;
-  padding: 1rem;
-  z-index: 100;
+  gap: 0.5rem;
+}
+
+.input-bar-buttons {
+  display: flex;
+  align-items: center;
+  width: 100%;
 }
 
 .input-container {
   display: flex;
-  align-items: center;
+  align-items: left;
   gap: 1rem;
+  flex: 1;
   font-size: var(--font-size);
+  background-color: var(--secondary-bg);
+  border-radius: 20px;
+  padding: 1rem;
+  z-index: 100;
+  box-shadow: inset 1px 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.chat-buttons-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.accuracy-container {
+  margin-top: 2rem;
+  text-align: center;
+  font-size: var(--font-size);
+  color: var(--text-color);
 }
 
 .chat-input {
