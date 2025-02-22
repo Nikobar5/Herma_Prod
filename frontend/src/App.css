@@ -71,6 +71,77 @@ body {
 }
 /************* General ****************/
 
+/************* Tooltips ****************/
+[data-tooltip] {
+  position: relative;
+}
+
+[data-tooltip]:before,
+[data-tooltip]:after {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.15s ease;
+  position: absolute;
+  z-index: 1000;
+}
+
+[data-tooltip]:before {
+  content: attr(data-tooltip);
+  padding: 6px 10px;
+  border-radius: 8px;
+  background-color: var(--highlight-color);
+  color: white;
+  font-size: 12px;
+  white-space: nowrap;
+  bottom: 120%;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+[data-tooltip]:after {
+  content: "";
+  border-width: 5px;
+  border-style: solid;
+  border-color: var(--highlight-color) transparent transparent transparent;
+  bottom: 110%;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+[data-tooltip]:hover:before,
+[data-tooltip]:hover:after {
+  visibility: visible;
+  opacity: 1;
+}
+
+.sidebar-controls [data-tooltip]:before {
+  left: calc(100% + 10px);
+  bottom: 50%;
+  transform: translateY(50%);
+}
+
+.sidebar-controls [data-tooltip]:after {
+  left: calc(100% + 2px);
+  bottom: 50%;
+  transform: translateY(50%);
+  border-color: transparent var(--highlight-color) transparent transparent;
+}
+
+.chat-buttons-container [data-tooltip]:before {
+  left: calc(100% + 10px);
+  bottom: 50%;
+  transform: translateY(50%);
+}
+
+.chat-buttons-container [data-tooltip]:after {
+  left: calc(100% + 2px);
+  bottom: 50%;
+  transform: translateY(50%);
+  border-color: transparent var(--highlight-color) transparent transparent;
+}
+/************* Tooltips ****************/
+
 
 /************* Sidebar ****************/
 .sidebar-container {
@@ -178,6 +249,7 @@ body {
   position: relative;
   transition: all 0.2s ease;
   background-color: var(--primary-bg);
+  overflow: hidden;
 }
 
 .file-item:hover {
@@ -193,12 +265,48 @@ body {
 .file-selected:hover {
   background-color: rgba(255, 255, 255, 0.25);
 }
+
+.files-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sidebar-loading-dots {
+  display: flex;
+  gap: 3px;
+}
+
+.sidebar-dot {
+  width: 4px;
+  height: 4px;
+  background-color: var(--text-color);
+  border-radius: 50%;
+  animation: bounce 1.4s infinite ease-in-out;
+}
+
+.sidebar-dot:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.sidebar-dot:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+@keyframes bounce {
+  0%, 80%, 100% { 
+    transform: scale(0);
+  } 
+  40% { 
+    transform: scale(1.0);
+  }
+}
 /************* Sidebar ****************/
 
 
 /************* Center Start ****************/
 .centered-start {
-  flex: 1;
+  flex: 3;
   display: flex;
   position: fixed;
   flex-direction: column;
@@ -313,6 +421,37 @@ body {
   margin-top: 1rem;
 }
 
+.loading-dots {
+  display: flex;
+  gap: 4px;
+  padding: 8px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  background-color: var(--text-color);
+  border-radius: 50%;
+  animation: bounce 1.4s infinite ease-in-out;
+}
+
+.dot:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.dot:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+@keyframes bounce {
+  0%, 80%, 100% { 
+    transform: scale(0);
+  } 
+  40% { 
+    transform: scale(1.0);
+  }
+}
+
 .bot-logo {
   width: 40px;
   height: 40px;
@@ -393,6 +532,10 @@ body {
   color: var(--button-hover);
 }
 
+.upload-button:hover::before {
+  content: attr(data-tooltip)
+}
+
 .file-thumbnail {
   width: 24px;
   height: 24px;
@@ -400,6 +543,12 @@ body {
   object-fit: cover;
   border-radius: 4px;
   padding: 0px;
+}
+
+.file-thumbnail,
+.file-pfp {
+  flex-shrink: 0;
+  margin-right: 0.5rem;
 }
 
 .delete-button {

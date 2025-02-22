@@ -51,6 +51,7 @@ const Home: React.FC = () => {
 
   useEffect(() => {
     const messageHandler = (_event: any, chunk: string) => {
+      setLoading(false)
       setMessages(prevMessages => {
         const lastMessage = prevMessages[prevMessages.length - 1];
         if (lastMessage && !lastMessage.isUser) {
@@ -176,12 +177,39 @@ const Home: React.FC = () => {
       console.error("Error sending message:", error);
       setMessages(prevMessages => [
         ...prevMessages,
-        { text: marked("❌ Error: Failed to send message"), isUser: false }
+        { text: marked("❌ Error: Failed to send message") as string, isUser: false }
       ]);
     } finally {
       setLoading(false);
     }
   };
+
+  const LoadingDots = () => (
+    <div className="loading-dots">
+      <div className="dot"></div>
+      <div className="dot"></div>
+      <div className="dot"></div>
+    </div>
+  );
+  
+  const LoadingMessage = () => (
+    <div className="bot-message-container">
+      <div className="bot-pfp">
+        <img src="boots.jpeg" alt="Bot" className="bot-logo" />
+      </div>
+      <div className="message bot-message">
+        <LoadingDots />
+      </div>
+    </div>
+  );
+
+  const SidebarLoadingDots = () => (
+    <div className="sidebar-loading-dots">
+      <div className="sidebar-dot"></div>
+      <div className="sidebar-dot"></div>
+      <div className="sidebar-dot"></div>
+    </div>
+  );
 
   return (
     <div className="container">
@@ -191,7 +219,10 @@ const Home: React.FC = () => {
             <h2>Herma</h2>
           </div>
           <div className="files-section">
+          <div className="files-header">
             <h3>Uploaded Files</h3>
+            {isUploading && <SidebarLoadingDots />}
+          </div>
             <ul className="files-list">
               {uploadedFiles.map((filename, index) => (
                 <li
@@ -210,7 +241,7 @@ const Home: React.FC = () => {
                       className="file-thumbnail"
                     />
                   ) : (
-                    <svg
+                    <svg className="file-pfp"
                       xmlns="http://www.w3.org/2000/svg"
                       viewBox="0 0 24 24"
                       fill="currentColor"
@@ -220,7 +251,7 @@ const Home: React.FC = () => {
                       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
                     </svg>
                   )}
-                  {filename}
+                  <span>{filename}</span>
                   <button
                     className="delete-button"
                     onClick={(e) => handleDeleteFile(filename, e)}
@@ -245,6 +276,7 @@ const Home: React.FC = () => {
           <button
             className="sidebar-toggle"
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            data-tooltip={isSidebarOpen ? "Hide sidebar" : "Show sidebar"}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -256,7 +288,8 @@ const Home: React.FC = () => {
               <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" />
             </svg>
           </button>
-          <button className="new-chat-button">
+          <button className="new-chat-button"
+            data-tooltip="New chat">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 24 24"
@@ -289,6 +322,7 @@ const Home: React.FC = () => {
                   </div>
                 )
               ))}
+              {loading && <LoadingMessage />}
               <div ref={messageEndRef} />
             </div>
             <form className="chat-form" onSubmit={handleSubmit}>
@@ -300,11 +334,12 @@ const Home: React.FC = () => {
                     value={chatMessage}
                     onChange={handleChatInput}
                     className="chat-input"
-                    disabled={loading || isUploading}
+                    disabled={loading || isUploading} 
                   />
                 </div>
                 <div className="chat-buttons-container">
-                    <label className="upload-button">
+                    <label className="upload-button"
+                      data-tooltip="Select files to upload">
                       <input
                         type="file"
                         onChange={handleFileUpload}
@@ -325,6 +360,7 @@ const Home: React.FC = () => {
                       type="submit"
                       className="submit-button"
                       disabled={loading || isUploading}
+                      data-tooltip="Ask Herma"
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -361,7 +397,7 @@ const Home: React.FC = () => {
                   disabled={loading || isUploading}
                 />
               </div>
-              <label className="upload-button">
+              <label className="upload-button" data-tooltip="Select files to upload">
                   <input
                     type="file"
                     onChange={handleFileUpload}
