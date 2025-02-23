@@ -539,17 +539,20 @@ body {
 
 .input-container {
   display: flex;
-  align-items: left;
   gap: 1rem;
   flex: 1;
   font-size: var(--font-size);
   background-color: var(--secondary-bg);
   border-radius: 20px;
-  padding: 1rem;
   z-index: 100;
   box-shadow: inset 1px 2px 4px rgba(0, 0, 0, 0.2);
   max-width: calc(var(--chat-max-width) - 130px);
-  max-height: 15rem;
+  min-height: 2rem; /* Minimum height */
+  max-height: 15rem; /* Maximum height */
+  overflow-y: auto; /* Add scrollbar when content exceeds max height */
+  display: flex;
+  align-items: flex-start; /* Align to top instead of center */
+  padding: 0.75rem 1rem;
 }
 
 .chat-buttons-container {
@@ -568,7 +571,15 @@ body {
   outline: none;
   color: var(--text-color);
   font-size: var(--small-size);
-  padding: 0.5rem;
+  font-family: Roboto, Arial;
+  min-height: 1.5rem; /* Minimum height for the textarea */
+  max-height: 13rem; /* Maximum height slightly less than container */
+  resize: none; /* Prevent manual resizing */
+  overflow-y: auto; /* Add scrollbar when needed */
+  line-height: 1.5; /* Improve text readability */
+  padding: 0; /* Remove padding since container has padding */
+  margin: 0;
+  width: 100%;
 }
 
 .accuracy-disclaimer {
@@ -586,6 +597,10 @@ body {
   cursor: pointer;
   padding: 0.5rem;
   color: var(--text-color);
+}
+
+.submit-button {
+  margin-bottom: 0.125rem;
 }
 
 .upload-button:hover,

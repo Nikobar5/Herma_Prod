@@ -53,8 +53,10 @@ const Home: React.FC = () => {
     
     // Reset height to auto to get the correct scrollHeight
     textarea.style.height = 'auto';
+    // Calculate new height while respecting min/max constraints
+    const newHeight = Math.min(Math.max(textarea.scrollHeight, 24), 208); // 24px min, 208px max
     // Set the height to match the content
-    textarea.style.height = `${textarea.scrollHeight}px`;
+    textarea.style.height = `${newHeight}px`;
   };
 
   // Handle image upload
@@ -473,14 +475,15 @@ const Home: React.FC = () => {
             {loading && <div className="loading">Loading...</div>}
             <form className="chat-form-centered" onSubmit={handleSubmit}>
               <div className="input-container">
-                <input
-                  type="text"
-                  placeholder="Ask Herma Anything!"
-                  value={chatMessage}
-                  onChange={handleChatInput}
-                  className="chat-input"
-                  disabled={loading || isUploading}
-                />
+                <textarea
+                    placeholder="Ask Herma Anything!"
+                    value={chatMessage}
+                    onChange={handleChatInput}
+                    className="chat-input"
+                    disabled={loading || isUploading}
+                    rows={1}
+                    style={{ height: 'auto' }}
+                  />
               </div>
               <label className="upload-button" data-tooltip="Select files to upload">
                   <input
