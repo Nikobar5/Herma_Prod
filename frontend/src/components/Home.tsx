@@ -29,6 +29,7 @@ const Home: React.FC = () => {
   const [clickTimers, setClickTimers] = useState<ClickTimer>({});
   const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const[showAlert, setShowAlert] = useState(false);
 
   const messageEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -83,6 +84,18 @@ const Home: React.FC = () => {
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+
+    const validTypes = [
+      '.pdf', '.txt', '.md', '.docx', '.pptx', 
+      '.xlsx', '.csv', '.json'
+    ];
+    
+    const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
+    if (!validTypes.includes(fileExtension)) {
+      setShowAlert(true);
+      event.target.value = ''; // Clear the file input
+      return;
+    }
 
     setIsUploading(true);
     try {
@@ -211,6 +224,47 @@ const Home: React.FC = () => {
     </div>
   );
 
+  interface FileTypeAlertProps {
+    isVisible: boolean;
+    onClose: () => void;
+  }
+
+  const FileTypeAlert: React.FC<FileTypeAlertProps> = ({ isVisible, onClose }) => {
+    if (!isVisible) return null;
+  
+    return (
+      <div className="alert-overlay">
+        <div className="alert-container">
+          <div className="alert-content">
+            <svg 
+              xmlns="http://www.w3.org/2000/svg" 
+              width="24" 
+              height="24" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2" 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              className="alert-icon"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+            <div className="alert-text">
+              <p>Invalid file type. Please upload only supported file types:</p>
+              <p>.pdf, .txt, .md, .docx, .pptx, .xlsx, .csv, .json</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="alert-close-btn">
+            Close
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="container">
       <div className={`sidebar-container ${!isSidebarOpen ? 'closed' : ''}`}>
@@ -227,7 +281,7 @@ const Home: React.FC = () => {
                       <input
                         type="file"
                         onChange={handleFileUpload}
-                        accept=".pdf,.txt,.md,.docx,.pptx,.xlsx,.csv,.json,.png,.jpg,.jpeg,.gif"
+                        accept=".pdf,.txt,.md,.docx,.pptx,.xlsx,.csv,.json"
                         style={{ display: "none" }}
                       />
                       <svg
@@ -429,7 +483,7 @@ const Home: React.FC = () => {
                     width="25"
                     height="25"
                   >
-                    <path d="M12 2l4 4h-3v9h-2V6H8l4-4zM4 22v-7h2v5h12v-5h2v7H4z" />
+                    <path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10zM8 13.01l1.41 1.41L11 12.84V17h2v-4.16l1.59 1.59L16 13.01 12.01 9 8 13.01z"/>
                   </svg>
 
                   </label>
@@ -452,6 +506,10 @@ const Home: React.FC = () => {
           </div>
         )}
       </div>
+      <FileTypeAlert 
+        isVisible={showAlert} 
+        onClose={() => setShowAlert(false)} 
+      />
     </div>
   );
 };

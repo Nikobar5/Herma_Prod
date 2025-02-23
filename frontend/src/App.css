@@ -114,8 +114,65 @@ body {
 [data-tooltip]:hover:after {
   visibility: visible;
   opacity: 1;
-}/************* Tooltips ****************/
+}
+/************* Tooltips ****************/
 
+/************* Alert Popup ****************/
+.alert-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+}
+
+.alert-container {
+
+  background-color: var(--secondary-bg);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: var(--shadow-lg);
+}
+
+.alert-content {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.alert-text {
+  align-items: center;
+  justify-content: center;
+}
+
+.alert-icon {
+  color: #ef4444;
+  flex-shrink: 0;
+}
+
+.alert-close-btn {
+  width: 100%;
+  padding: 0.5rem;
+  background-color: var(--highlight-color);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.alert-close-btn:hover {
+  background-color: var(--primary-bg);
+}
+/************* Alert Popup ****************/
 
 /************* Sidebar ****************/
 .sidebar-container {
