@@ -47,7 +47,7 @@ const Home: React.FC = () => {
     scrollToBottom();
   }, [messages]); // Auto-scroll whenever messages are updated
 
-  const handleChatInput = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChatInput = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     const textarea = event.target;
     setChatMessage(event.target.value);
     
@@ -430,7 +430,7 @@ const Home: React.FC = () => {
                       <input
                         type="file"
                         onChange={handleFileUpload}
-                        accept=".pdf,.txt,.md,.docx,.pptx,.xlsx,.csv,.json,.png,.jpg,.jpeg,.gif"
+                        accept=".pdf,.txt,.md,.docx,.pptx,.xlsx,.csv,.json"
                         style={{ display: "none" }}
                       />
                       <svg
@@ -462,7 +462,7 @@ const Home: React.FC = () => {
                   </div>
                 </div>
                 <div className="accuracy-disclaimer">
-                  Herma isn't perfect. Double check important information.
+                  Herma isn't perfect. Always verify important information.
                 </div>
             </form>
           </div>
@@ -489,7 +489,7 @@ const Home: React.FC = () => {
                   <input
                     type="file"
                     onChange={handleFileUpload}
-                    accept=".pdf,.txt,.md,.docx,.pptx,.xlsx,.csv,.json,.png,.jpg,.jpeg,.gif"
+                    accept=".pdf,.txt,.md,.docx,.pptx,.xlsx,.csv,.json"
                     style={{ display: "none" }}
                   />
                   <svg
