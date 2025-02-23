@@ -81,7 +81,7 @@ body {
   visibility: hidden;
   opacity: 0;
   pointer-events: none;
-  transition: all 0.15s ease;
+  transition: all 0.5s ease;
   position: absolute;
   z-index: 1000;
 }
@@ -94,63 +94,37 @@ body {
   color: white;
   font-size: 12px;
   white-space: nowrap;
-  bottom: 120%;
+  top: calc(100% + 10px); /* Position below the button */
   left: 50%;
   transform: translateX(-50%);
 }
 
 [data-tooltip]:after {
   content: "";
-  border-width: 5px;
-  border-style: solid;
-  border-color: var(--highlight-color) transparent transparent transparent;
-  bottom: 110%;
+  position: absolute;
+  top: calc(100% + 5px); /* Position the arrow just below the button */
   left: 50%;
   transform: translateX(-50%);
+  border-style: solid;
+  border-width: 0 5px 5px 5px;
+  border-color: transparent transparent var(--highlight-color) transparent;
 }
 
 [data-tooltip]:hover:before,
 [data-tooltip]:hover:after {
   visibility: visible;
   opacity: 1;
-}
-
-.sidebar-controls [data-tooltip]:before {
-  left: calc(100% + 10px);
-  bottom: 50%;
-  transform: translateY(50%);
-}
-
-.sidebar-controls [data-tooltip]:after {
-  left: calc(100% + 2px);
-  bottom: 50%;
-  transform: translateY(50%);
-  border-color: transparent var(--highlight-color) transparent transparent;
-}
-
-.chat-buttons-container [data-tooltip]:before {
-  left: calc(100% + 10px);
-  bottom: 50%;
-  transform: translateY(50%);
-}
-
-.chat-buttons-container [data-tooltip]:after {
-  left: calc(100% + 2px);
-  bottom: 50%;
-  transform: translateY(50%);
-  border-color: transparent var(--highlight-color) transparent transparent;
-}
-/************* Tooltips ****************/
+}/************* Tooltips ****************/
 
 
 /************* Sidebar ****************/
 .sidebar-container {
   position: relative;
+  width: var(--sidebar-width);
   display: flex;
   height: 100vh;
-  transform: 0.3s ease, margin-left 0.3s ease;
-  width: var(--sidebar-width);
-  flex: 1;
+  transform: width 0.3s ease;
+  flex: 0 0 auto;
 }
 
 .sidebar {
@@ -165,21 +139,24 @@ body {
   box-shadow: 0 0 50px rgba(0, 0, 0, 0.2);
 }
 
-.sidebar-closed {
-  transform: translateX(calc(-1*var(--sidebar-width)));
-}
 .sidebar-controls {
   position: absolute;
   top: 2rem;
-  right: 4rem;
+  right: 1rem;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: 0.5rem;
   z-index: 1100; /* Ensure it's above the sidebar */
-  transition: transform 0.3s ease;
+  transition: transform 0.3s ease, flex-direction 0.3s ease;
 }
 
+.sidebar-closed {
+  transform: translateX(calc(-1*var(--sidebar-width)));
+}
 
+.sidebar-container.closed {
+  width: 60px;
+}
 .sidebar-toggle,
 .new-chat-button {
   background: var(--secondary-bg);
@@ -199,10 +176,8 @@ body {
   background-color: var(--highlight-color);
 }
 
-/* When sidebar is closed, adjust the controls position */
 .sidebar-closed + .sidebar-controls {
   flex-direction: column;
-  transform: translateX(calc(-1*var(--sidebar-width)));
 }
 
 /* Adjust center content when sidebar is closed */
@@ -301,6 +276,30 @@ body {
     transform: scale(1.0);
   }
 }
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+  .sidebar {
+    display: none;
+  }
+
+  .sidebar-container {
+    display: none;
+  }
+  
+  .chat-container {
+    padding: 1rem;
+  }
+  
+  .chat-form {
+    width: calc(100% - 2rem);
+  }
+
+  .center {
+    margin-left: 0;
+    width: 100%;
+  }
+}
 /************* Sidebar ****************/
 
 
@@ -321,7 +320,7 @@ body {
 }
 
 .chat-form-centered {
-  width: 75vh;
+  width: 75rem;
   max-width: var(--chat-max-width);
   border-radius: 20px;
   display: flex;
@@ -602,19 +601,4 @@ body {
   background-color: #f9f9f9;
   color: #666;
   font-style: italic;
-}
-
-/* Responsive Design */
-@media (max-width: 768px) {
-  .sidebar {
-    display: none;
-  }
-  
-  .chat-container {
-    padding: 1rem;
-  }
-  
-  .chat-form {
-    width: calc(100% - 2rem);
-  }
 }

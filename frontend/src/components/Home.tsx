@@ -213,7 +213,7 @@ const Home: React.FC = () => {
 
   return (
     <div className="container">
-      <div className='sidebar-container'>
+      <div className={`sidebar-container ${!isSidebarOpen ? 'closed' : ''}`}>
         <div className={`sidebar ${isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
           <div className="logo-container">
             <h2>Herma</h2>
@@ -222,6 +222,24 @@ const Home: React.FC = () => {
           <div className="files-header">
             <h3>Uploaded Files</h3>
             {isUploading && <SidebarLoadingDots />}
+            <label className="upload-button"
+                      data-tooltip="Select files to upload">
+                      <input
+                        type="file"
+                        onChange={handleFileUpload}
+                        accept=".pdf,.txt,.md,.docx,.pptx,.xlsx,.csv,.json,.png,.jpg,.jpeg,.gif"
+                        style={{ display: "none" }}
+                      />
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                        width="25"
+                        height="25"
+                      >
+                        <path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10zM8 13.01l1.41 1.41L11 12.84V17h2v-4.16l1.59 1.59L16 13.01 12.01 9 8 13.01z"/>
+                      </svg>
+                    </label>
           </div>
             <ul className="files-list">
               {uploadedFiles.map((filename, index) => (
@@ -353,7 +371,7 @@ const Home: React.FC = () => {
                         width="25"
                         height="25"
                       >
-                        <path d="M12 2l4 4h-3v9h-2V6H8l4-4zM4 22v-7h2v5h12v-5h2v7H4z" />
+                        <path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10zM8 13.01l1.41 1.41L11 12.84V17h2v-4.16l1.59 1.59L16 13.01 12.01 9 8 13.01z"/>
                       </svg>
                     </label>
                     <button
