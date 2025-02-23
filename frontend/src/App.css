@@ -230,7 +230,7 @@ body {
 
 .sidebar-toggle:hover,
 .new-chat-button:hover {
-  background-color: var(--highlight-color);
+  background-color: #2d336b47;
 }
 
 .sidebar-closed + .sidebar-controls {
@@ -304,6 +304,10 @@ body {
   gap: 8px;
 }
 
+.files-header .upload-button {
+  margin-bottom: 0.5rem;
+}
+
 .sidebar-loading-dots {
   display: flex;
   gap: 3px;
@@ -335,7 +339,7 @@ body {
 }
 
 /* Responsive Design */
-@media (max-width: 1200px) {
+@media (max-width: 1400px) {
   .sidebar {
     display: none;
   }
@@ -440,7 +444,7 @@ body {
   display: flex;
   gap: 1rem;
   padding: 1rem;
-  font-family: 'Roboto', sans-serif;
+  font-family: Roboto, Arial;
   font-weight: 500;
   font-size: var(--font-size);
 }
@@ -586,10 +590,6 @@ body {
 .upload-button:hover,
 .submit-button:hover {
   color: var(--button-hover);
-}
-
-.upload-button:hover::before {
-  content: attr(data-tooltip)
 }
 
 .file-thumbnail {
