@@ -3,6 +3,12 @@ import React, { useState, useRef, useEffect } from "react";
 const { ipcRenderer } = window.require('electron');
 import {marked} from 'marked';
 
+marked.setOptions({
+  gfm: true,
+  breaks: true,
+  pedantic: false
+});
+
 declare global {
   interface Window {
     require: (module: string) => any;
@@ -42,7 +48,13 @@ const Home: React.FC = () => {
   }, [messages]); // Auto-scroll whenever messages are updated
 
   const handleChatInput = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const textarea = event.target;
     setChatMessage(event.target.value);
+    
+    // Reset height to auto to get the correct scrollHeight
+    textarea.style.height = 'auto';
+    // Set the height to match the content
+    textarea.style.height = `${textarea.scrollHeight}px`;
   };
 
   // Handle image upload
@@ -400,14 +412,15 @@ const Home: React.FC = () => {
             <form className="chat-form" onSubmit={handleSubmit}>
               <div className="input-bar-buttons">
                 <div className="input-container">
-                  <input
-                    type="text"
-                    placeholder="Ask Herma"
-                    value={chatMessage}
-                    onChange={handleChatInput}
-                    className="chat-input"
-                    disabled={loading || isUploading} 
-                  />
+                <textarea
+                  placeholder="Ask Herma Anything!"
+                  value={chatMessage}
+                  onChange={handleChatInput}
+                  className="chat-input"
+                  disabled={loading || isUploading}
+                  rows={1}
+                  style={{ height: 'auto' }}
+                />
                 </div>
                 <div className="chat-buttons-container">
                     <label className="upload-button"
