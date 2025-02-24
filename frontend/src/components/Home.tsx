@@ -521,6 +521,7 @@ const Home: React.FC = () => {
                     type="submit"
                     className="submit-button"
                     disabled={loading || isUploading}
+                    data-tooltip="Ask Herma"
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"

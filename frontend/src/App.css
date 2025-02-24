@@ -27,7 +27,7 @@
   --h6-size: calc(var(--small-size) / var(--ratio));
 
   --font: 'Times New Roman', Times, serif, sans-serif;
-  --font-size: 22px;
+  --font-size: 18px;
 
   /* Spacing System */
   --margin-xxs: 0.25rem;
@@ -227,6 +227,7 @@ body {
   justify-content: center;
   transition: background-color 0.2s ease;
 }
+
 
 .sidebar-closed + .sidebar-controls {
   flex-direction: column;
