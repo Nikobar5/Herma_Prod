@@ -197,6 +197,11 @@ const Home: React.FC = () => {
     setChatMessage("");
     setHasStarted(true);
 
+    const textarea = document.querySelector('.chat-input') as HTMLTextAreaElement;
+    if (textarea) {
+      textarea.style.height = 'auto';
+    }
+
     try {
       console.log("Attempting to send message:", currentMessage);
       await ipcRenderer.invoke('start-chat', { message: currentMessage });
@@ -208,6 +213,13 @@ const Home: React.FC = () => {
       ]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleKeyPress = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      handleSubmit(event);
     }
   };
 
@@ -418,6 +430,7 @@ const Home: React.FC = () => {
                   placeholder="Ask Herma Anything!"
                   value={chatMessage}
                   onChange={handleChatInput}
+                  onKeyPress={handleKeyPress}
                   className="chat-input"
                   disabled={loading || isUploading}
                   rows={1}
@@ -479,6 +492,7 @@ const Home: React.FC = () => {
                     placeholder="Ask Herma Anything!"
                     value={chatMessage}
                     onChange={handleChatInput}
+                    onKeyPress={handleKeyPress}
                     className="chat-input"
                     disabled={loading || isUploading}
                     rows={1}
