@@ -256,6 +256,31 @@ async function setupIPC() {
       );
     });
   });
+    ipcMain.handle('new-session', async () => {
+    await ensurePythonShell();
+    const requestId = (++requestCounter).toString();
+
+    return new Promise((resolve, reject) => {
+      messageCallbacks.set(requestId, (response: PythonMessage) => {
+        messageCallbacks.delete(requestId);
+        if (response.error) reject(new Error(response.error));
+        else resolve(response);
+      });
+
+      if (!pythonProcess) {
+        reject(new Error('Python process not available'));
+        return;
+      }
+
+      pythonProcess.stdin.write(
+        JSON.stringify({
+          requestId,
+          command: 'new_session',
+          data: {}
+        }) + '\n'
+      );
+    });
+    });
 
   // Get files handler
   ipcMain.handle('get-files', async () => {

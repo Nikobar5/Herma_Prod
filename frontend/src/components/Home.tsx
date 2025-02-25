@@ -43,6 +43,23 @@ const Home: React.FC = () => {
     messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+      // First, add a new function to reset everything
+    const handleNewChat = async () => {
+      // Clear messages
+      setMessages([]);
+      // Reset hasStarted state
+      setHasStarted(false);
+      // Clear selected files
+      setSelectedFiles([]);
+
+      try {
+        // Tell the backend to reset the session
+        await ipcRenderer.invoke('new-session');
+      } catch (error) {
+        console.error("Error creating new session:", error);
+      }
+    };
+
   useEffect(() => {
     scrollToBottom();
   }, [messages]); // Auto-scroll whenever messages are updated
@@ -386,18 +403,21 @@ const Home: React.FC = () => {
               <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" />
             </svg>
           </button>
-          <button className="new-chat-button"
-            data-tooltip="New chat">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              width="24"
-              height="24"
+            <button
+              className="new-chat-button"
+              data-tooltip="New chat"
+              onClick={handleNewChat}
             >
-              <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
-            </svg>
-          </button>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                width="24"
+                height="24"
+              >
+                <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+              </svg>
+            </button>
         </div>
       </div>
       <div className="center">

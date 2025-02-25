@@ -95,6 +95,23 @@ class PythonServer:
             "done": True
         }), flush=True)
 
+    def handle_new_session(self, request_id):
+        """Handle creating a new session"""
+        try:
+            # Reset the session by creating a new one with empty data
+            self.session = Session(currently_used_data=[])
+
+            print(json.dumps({
+                "requestId": request_id,
+                "success": True,
+                "done": True
+            }), flush=True)
+        except Exception as e:
+            print(json.dumps({
+                "requestId": request_id,
+                "error": f"New session creation failed: {str(e)}"
+            }), flush=True)
+
     def handle_select(self, request_id, data):
         """Handle file selection for context"""
         try:
@@ -226,6 +243,8 @@ class PythonServer:
                     self.handle_select(request_id, payload)
                 elif command == 'shutdown':
                     self.handle_shutdown(request_id)
+                elif command == 'new_session':
+                    self.handle_new_session(request_id)
                 else:
                     print(json.dumps({
                         "requestId": request_id,
