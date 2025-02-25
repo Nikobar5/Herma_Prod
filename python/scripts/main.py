@@ -1,6 +1,5 @@
 import sys
 import json
-import os
 import shutil
 import atexit
 from pathlib import Path
@@ -8,6 +7,7 @@ from session import Session
 from uploaded_data import Uploaded_data
 from data_store import DataStore
 import signal
+import platform
 
 class PythonServer:
     def __init__(self):
@@ -21,19 +21,42 @@ class PythonServer:
 
         pickle_path = str(self.storage_dir.resolve() / "uploaded_data_store.pkl")
 
-        signal.signal(signal.SIGINT, self.handle_signal)
-        signal.signal(signal.SIGTERM, self.handle_signal)
+        # Set up platform-specific signal handlers
+        if platform.system() != 'Windows':
+            # Unix-like systems
+            signal.signal(signal.SIGINT, self.handle_signal)
+            signal.signal(signal.SIGTERM, self.handle_signal)
+        else:
+            # Windows - more limited signal support
+            signal.signal(signal.SIGINT, self.handle_signal)
+            try:
+                signal.signal(signal.SIGBREAK, self.handle_signal)
+            except AttributeError:
+                # SIGBREAK might not be defined in all environments
+                pass
+
+        # Register atexit handler as fallback for Windows and red X button clicks
+        atexit.register(self.clean_exit)
 
         # Store data file in storage directory
         self.uploaded_data_store = DataStore(pickle_path)
         self.session = Session(currently_used_data=[])
         self.is_running = True
 
+    def clean_exit(self):
+        """Cleanup method for atexit and other non-signal exits"""
+        if self.is_running:  # Only do this if we haven't already done cleanup
+            print("Application exiting, saving data...")
+            try:
+                self.uploaded_data_store.save()
+            except Exception as e:
+                print(f"Error during exit cleanup: {e}")
+            self.is_running = False
+
     def handle_signal(self, signum, frame):
         """Handle shutdown signals"""
         print(f"Received signal {signum}, saving data and shutting down...")
-        self.uploaded_data_store.save()
-        self.is_running = False
+        self.clean_exit()
         sys.exit(0)
 
     def handle_ping(self, request_id):

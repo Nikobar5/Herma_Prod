@@ -174,33 +174,21 @@ async function startOllama() {
   }
 }
 
-// Remove the duplicate startOllama function and move the before-quit handler outside
-
-app.on('before-quit', async () => {
-  try {
-    // First send shutdown to Python
-    if (pythonProcess) {
-      pythonProcess.stdin.write(
-        JSON.stringify({
-          requestId: 'shutdown',
-          command: 'shutdown',
-          data: {}
-        }) + '\n'
-      );
-
-      // Give Python time to save
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      pythonProcess.kill();
-      pythonProcess = null;
-    }
-
-    // Then kill Ollama
-    await killOllama();
-  } catch (error) {
-    console.error('Error during shutdown:', error);
+// Add a proper quit method that can be called from anywhere
+function quitApplication() {
+  if (pythonProcess) {
+    pythonProcess.stdin.write(
+      JSON.stringify({
+        requestId: 'shutdown',
+        command: 'shutdown',
+        data: {}
+      }) + '\n'
+    );
   }
-});
+  setTimeout(() => {
+    app.quit();
+  }, 1000);
+}
 
 async function setupIPC() {
   await initializePythonShell();
@@ -238,36 +226,37 @@ async function setupIPC() {
     });
   });
 
-// File upload handler
-ipcMain.handle('upload-file', async (_event: Electron.IpcMainInvokeEvent, { filename, data }: FileUpload) => {
-  await ensurePythonShell();
-  const requestId = (++requestCounter).toString();
-  const uploadPath = path.join(STORAGE_DIR, 'uploads');
-  await fs.mkdir(uploadPath, { recursive: true });
-  const tempPath = path.join(uploadPath, `temp_${filename}`);
-  await fs.writeFile(tempPath, data);
+  // File upload handler
+  ipcMain.handle('upload-file', async (_event: Electron.IpcMainInvokeEvent, { filename, data }: FileUpload) => {
+    await ensurePythonShell();
+    const requestId = (++requestCounter).toString();
+    const uploadPath = path.join(STORAGE_DIR, 'uploads');
+    await fs.mkdir(uploadPath, { recursive: true });
+    const tempPath = path.join(uploadPath, `temp_${filename}`);
+    await fs.writeFile(tempPath, data);
 
-  return new Promise((resolve, reject) => {
-    messageCallbacks.set(requestId, (response: PythonMessage) => {
-      messageCallbacks.delete(requestId);
-      if (response.error) reject(new Error(response.error));
-      else resolve(response);
+    return new Promise((resolve, reject) => {
+      messageCallbacks.set(requestId, (response: PythonMessage) => {
+        messageCallbacks.delete(requestId);
+        if (response.error) reject(new Error(response.error));
+        else resolve(response);
+      });
+
+      if (!pythonProcess) {
+        reject(new Error('Python process not available'));
+        return;
+      }
+
+      pythonProcess.stdin.write(
+        JSON.stringify({
+          requestId,
+          command: 'upload',
+          data: { filename, filepath: tempPath }
+        }) + '\n'
+      );
     });
-
-    if (!pythonProcess) {
-      reject(new Error('Python process not available'));
-      return;
-    }
-
-    pythonProcess.stdin.write(
-      JSON.stringify({
-        requestId,
-        command: 'upload',
-        data: { filename, filepath: tempPath }
-      }) + '\n'
-    );
   });
-});
+
   // Get files handler
   ipcMain.handle('get-files', async () => {
     const uploadPath = path.join(STORAGE_DIR, 'uploads');
@@ -302,24 +291,24 @@ ipcMain.handle('upload-file', async (_event: Electron.IpcMainInvokeEvent, { file
       );
     });
   });
-ipcMain.handle('open-file', async (_event: Electron.IpcMainInvokeEvent, { filename }: { filename: string }) => {
-  try {
-    const filePath = path.join(UPLOADS_DIR, filename);
 
-    // Check if file exists
-    await fs.access(filePath);
+  ipcMain.handle('open-file', async (_event: Electron.IpcMainInvokeEvent, { filename }: { filename: string }) => {
+    try {
+      const filePath = path.join(UPLOADS_DIR, filename);
 
-    // Open file with default system application
-    await shell.openPath(filePath);
+      // Check if file exists
+      await fs.access(filePath);
 
-    return { success: true };
-  } catch (error: unknown) {
-    console.error('Error opening file:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    throw new Error(`Failed to open file: ${errorMessage}`);
-  }
-});
+      // Open file with default system application
+      await shell.openPath(filePath);
 
+      return { success: true };
+    } catch (error: unknown) {
+      console.error('Error opening file:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      throw new Error(`Failed to open file: ${errorMessage}`);
+    }
+  });
 
   // Select files handler
   ipcMain.handle('select-files', async (_event: Electron.IpcMainInvokeEvent, { filenames }: FileSelection) => {
@@ -378,15 +367,56 @@ app.whenReady().then(async () => {
   createWindow();
 });
 
+// Handle window close events properly
 app.on('window-all-closed', () => {
+  // On macOS applications keep running unless user explicitly quits
   if (process.platform !== 'darwin') {
     app.quit();
+  } else {
+    // For macOS, we still need to tell Python to save data
+    if (pythonProcess) {
+      pythonProcess.stdin.write(
+        JSON.stringify({
+          requestId: 'save',
+          command: 'shutdown',
+          data: {}
+        }) + '\n'
+      );
+    }
   }
 });
 
-app.on('before-quit', () => {
+// Properly typed before-quit handler
+app.on('before-quit', async (event: Electron.Event) => {
+  // If we haven't cleaned up yet, prevent immediate quit to allow cleanup
   if (pythonProcess) {
-    pythonProcess.kill();
-    pythonProcess = null;
+    // Only prevent default if this is the first time
+    event.preventDefault();
+
+    try {
+      // Send shutdown to Python
+      pythonProcess.stdin.write(
+        JSON.stringify({
+          requestId: 'shutdown',
+          command: 'shutdown',
+          data: {}
+        }) + '\n'
+      );
+
+      // Give Python time to save
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      pythonProcess.kill();
+      pythonProcess = null;
+
+      // Then kill Ollama
+      await killOllama();
+
+      // Now quit for real
+      app.quit();
+    } catch (error) {
+      console.error('Error during shutdown:', error);
+      app.quit(); // Try to quit anyway
+    }
   }
 });
