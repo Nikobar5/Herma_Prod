@@ -376,8 +376,9 @@ body {
 }
 
 .chat-form-centered {
-  width: 75rem;
-  max-width: var(--chat-max-width);
+  width: 100rem;
+  max-width: calc(4 * var(--chat-max-width));
+  transform: translateX(27%);
   border-radius: 20px;
   display: flex;
   align-items: center;
@@ -420,7 +421,7 @@ body {
   flex-direction: column;
   height: calc(100vh - 80px);
   max-width: var(--chat-max-width);
-  min-width: 1000px;
+  min-width: var(--chat-max-width);
   position: fixed;
   overflow-y: auto;
   scrollbar-color: transparent transparent;
