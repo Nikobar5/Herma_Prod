@@ -405,9 +405,10 @@ app.on('before-quit', async (event: Electron.Event) => {
 
       // Give Python time to save
       await new Promise(resolve => setTimeout(resolve, 1000));
-
-      pythonProcess.kill();
-      pythonProcess = null;
+      if (pythonProcess) {
+        pythonProcess.kill();
+        pythonProcess = null;
+      }
 
       // Then kill Ollama
       await killOllama();
