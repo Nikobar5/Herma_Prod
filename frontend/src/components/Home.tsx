@@ -251,7 +251,7 @@ const Home: React.FC = () => {
   const LoadingMessage = () => (
     <div className="bot-message-container">
       <div className="bot-pfp">
-        <img src="boots.jpeg" alt="Bot" className="bot-logo" />
+        <img src="Herma.jpeg" alt="Bot" className="bot-logo" />
       </div>
       <div className="message bot-message">
         <LoadingDots />
