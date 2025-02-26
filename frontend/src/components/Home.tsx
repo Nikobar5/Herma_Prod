@@ -339,7 +339,7 @@ const Home: React.FC = () => {
                     </label>
           </div>
             <ul className="files-list">
-              {uploadedFiles.map((filename, index) => (
+               {[...uploadedFiles].reverse().map((filename, index) => (
                 <li
                   key={index}
                   className={`file-item ${selectedFiles.includes(filename) ? 'file-selected' : ''}`}

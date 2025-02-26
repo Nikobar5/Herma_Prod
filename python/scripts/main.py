@@ -112,6 +112,24 @@ class PythonServer:
                 "error": f"New session creation failed: {str(e)}"
             }), flush=True)
 
+    def handle_get_files(self, request_id):
+        """Return files in the order they were added"""
+        try:
+            # Return filenames in the same order as our data store
+            filenames = [uploaded_data.name for uploaded_data in self.uploaded_data_store.data]
+
+            print(json.dumps({
+                "requestId": request_id,
+                "files": filenames,
+                "success": True,
+                "done": True
+            }), flush=True)
+        except Exception as e:
+            print(json.dumps({
+                "requestId": request_id,
+                "error": f"Get files failed: {str(e)}"
+            }), flush=True)
+
     def handle_select(self, request_id, data):
         """Handle file selection for context"""
         try:
@@ -245,6 +263,8 @@ class PythonServer:
                     self.handle_shutdown(request_id)
                 elif command == 'new_session':
                     self.handle_new_session(request_id)
+                elif command == 'get_files':
+                    self.handle_get_files(request_id)
                 else:
                     print(json.dumps({
                         "requestId": request_id,

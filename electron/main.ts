@@ -31,6 +31,7 @@ interface PythonMessage {
   error?: string;
   done?: boolean;
   success?: boolean;
+  files?: string[];
 }
 
 type MessageCallback = (message: PythonMessage) => void;
@@ -282,13 +283,31 @@ async function setupIPC() {
     });
     });
 
-  // Get files handler
-  ipcMain.handle('get-files', async () => {
-    const uploadPath = path.join(STORAGE_DIR, 'uploads');
-    await fs.mkdir(uploadPath, { recursive: true });
-    const files = await fs.readdir(uploadPath);
-    return files;
-  });
+    ipcMain.handle('get-files', async () => {
+      await ensurePythonShell();
+      const requestId = (++requestCounter).toString();
+
+      return new Promise((resolve, reject) => {
+        messageCallbacks.set(requestId, (response: PythonMessage) => {
+          messageCallbacks.delete(requestId);
+          if (response.error) reject(new Error(response.error));
+          else resolve(response.files || []);
+        });
+
+        if (!pythonProcess) {
+          reject(new Error('Python process not available'));
+          return;
+        }
+
+        pythonProcess.stdin.write(
+          JSON.stringify({
+            requestId,
+            command: 'get_files',
+            data: {}
+          }) + '\n'
+        );
+      });
+    });
 
   // Delete file handler
   ipcMain.handle('delete-file', async (_event: Electron.IpcMainInvokeEvent, { filename }: FileOperation) => {
