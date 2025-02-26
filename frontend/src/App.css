@@ -181,6 +181,7 @@ body {
   display: flex;
   height: 100vh;
   transform: width 0.3s ease;
+  min-width: 60px;
 }
 
 .sidebar {
@@ -193,6 +194,8 @@ body {
   transition: transform 0.3s ease;
   z-index: 1000;
   box-shadow: 0 0 50px rgba(0, 0, 0, 0.2);
+  height: 100vh;
+  overflow-y: auto;
 }
 
 .sidebar-controls {
@@ -335,16 +338,26 @@ body {
 
 /* Responsive Design */
 @media (max-width: 1400px) {
+  .root {
+    --chat-min-width: 80%;
+  }
   .sidebar {
     display: none;
   }
 
   .sidebar-container {
-    display: none;
+   /* display: none;*/
+   width: 60px;
+  }
+
+  .sidebar-container.open .sidebar {
+    transform: translateX(0);
   }
   
   .chat-container {
     padding: 1rem;
+    min-width: auto;
+    max-width: 90%;
   }
   
   .chat-form {
@@ -354,6 +367,25 @@ body {
   .center {
     margin-left: 0;
     width: 100%;
+  }
+
+  .sidebar-closed + .sidebar-controls {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 768px) {
+  :root {
+    --chat-max-width: 95%;
+    --message-max-width: 85%;
+  }
+
+  .input-container {
+    max-width: calc(100% - 80px);
+  }
+
+  .sidebar-closed + .sidebar-controls {
+    flex-direction: column;
   }
 }
 /************* Sidebar ****************/
@@ -518,19 +550,26 @@ body {
 .chat-form {
   position: fixed;
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   flex-direction: column;
   flex: 1;
   bottom: 0.75rem;
   margin-bottom: 8px;
   width: 100%;
-  max-width: 100%;
+  max-width: var(--chat-max-width);
   gap: 0.5rem;
+  align-self: center;
+  text-align: center;
+  color: var(--text-color);
+  opacity: 0.8;
 }
 
 .input-bar-buttons {
+  position: fixed;
   display: flex;
+  bottom: 3rem;
   width: 100%;
+  max-width: 100%;
 }
 
 .input-container {
@@ -550,6 +589,7 @@ body {
   display: flex;
   align-items: flex-start; /* Align to top instead of center */
   padding: 0.75rem 1rem;
+  width: 100%;
 }
 
 .chat-buttons-container {
@@ -581,7 +621,11 @@ body {
 
 .accuracy-disclaimer {
   align-self: center;
-  transform: translateX(-200%);
+  width: 100%;
+  text-align: center;
+  font-size: 0.8;
+  color: var(--text-color);
+  /*transform: translateX(-200%);*/
 }
 
 .chat-input::placeholder {
