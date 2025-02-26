@@ -4,6 +4,7 @@ from data_store import DataStore
 import time
 import subprocess
 import logging
+from pathlib import Path
 
 # For testing purposes only
 def main():
@@ -15,16 +16,10 @@ def main():
     except Exception as e:
         logging.error("Failed to start ollama serve: %s", str(e))
 
-    uploaded_data_store = DataStore("uploaded_data_store.pkl")
-    session_store = DataStore("session_store.pkl")
-    # uploaded_data = None
-    # currently_used_data_list = []
-    # uploaded_data = Uploaded_data("HAI_AI-Index-Report-2024.pdf", 'data/HAI_AI-Index-Report-2024.pdf')
-    # uploaded_data_store.add(uploaded_data)
-    # currently_used_data_list.append(uploaded_data)
-    # uploaded_data = Uploaded_data("coundouriotis00902 copy.pdf", 'data/coundouriotis00902 copy.pdf')
-    # uploaded_data_store.add(uploaded_data)
-    # currently_used_data_list.append(uploaded_data)
+    root_dir = Path(__file__).parent.parent.parent  # Go up to project root
+    storage_dir = root_dir / "storage"
+    upload_dir = storage_dir / "uploads"
+    uploaded_data_test = Uploaded_data("")
     session1 = Session(currently_used_data=[])
     query = ""
     print("How can I help you?")
@@ -38,8 +33,5 @@ def main():
         print(f"Execution time for ask is: {end_time - start_time:.6f} seconds")
         if session1.num_exchanges == 1:
             session1.assign_session_summary()
-    session_store.add(session1)
-    uploaded_data_store.save()
-    session_store.save()
 if __name__ == "__main__":
     main()

@@ -67,7 +67,7 @@ const Home: React.FC = () => {
   const handleChatInput = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     const textarea = event.target;
     setChatMessage(event.target.value);
-    
+
     // Reset height to auto to get the correct scrollHeight
     textarea.style.height = 'auto';
     // Calculate new height while respecting min/max constraints
@@ -117,10 +117,10 @@ const Home: React.FC = () => {
     if (!file) return;
 
     const validTypes = [
-      '.pdf', '.txt', '.md', '.docx', '.pptx', 
+      '.pdf', '.txt', '.md', '.docx', '.pptx',
       '.xlsx', '.csv', '.json'
     ];
-    
+
     const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
     if (!validTypes.includes(fileExtension)) {
       setShowAlert(true);
@@ -131,6 +131,10 @@ const Home: React.FC = () => {
     setIsUploading(true);
     try {
       const buffer = await file.arrayBuffer();
+
+      setUploadedFiles(prev => [...prev, file.name]);
+      setSelectedFiles(prev => [...prev, file.name]);
+
       await ipcRenderer.invoke('upload-file', {
         filename: file.name,
         data: Buffer.from(buffer)
@@ -247,7 +251,7 @@ const Home: React.FC = () => {
       <div className="dot"></div>
     </div>
   );
-  
+
   const LoadingMessage = () => (
     <div className="bot-message-container">
       <div className="bot-pfp">
@@ -274,21 +278,21 @@ const Home: React.FC = () => {
 
   const FileTypeAlert: React.FC<FileTypeAlertProps> = ({ isVisible, onClose }) => {
     if (!isVisible) return null;
-  
+
     return (
       <div className="alert-overlay">
         <div className="alert-container">
           <div className="alert-content">
-            <svg 
-              xmlns="http://www.w3.org/2000/svg" 
-              width="24" 
-              height="24" 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="2" 
-              strokeLinecap="round" 
-              strokeLinejoin="round" 
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
               className="alert-icon"
             >
               <circle cx="12" cy="12" r="10" />
@@ -557,9 +561,9 @@ const Home: React.FC = () => {
           </div>
         )}
       </div>
-      <FileTypeAlert 
-        isVisible={showAlert} 
-        onClose={() => setShowAlert(false)} 
+      <FileTypeAlert
+        isVisible={showAlert}
+        onClose={() => setShowAlert(false)}
       />
     </div>
   );

@@ -37,15 +37,39 @@ class Session:
         formatted_sources = None
         if self.currently_used_data != []:
             context = ""
-            sources_text = ""
+            source_filenames = []
             for data in self.currently_used_data:
                 context_text, sources = query_rag(input, data.vector_database_path)
-                sources_text += sources
-                context_text += "\n\n"
-                context += context_text
-            formatted_sources = f"\nSources:"
-            formatted_sources += sources_text
+                context += context_text + "\n\n"
+
+                # Parse source filenames and add to our collection
+                # Each source will be in format "filename\nfilename\n..."
+                if sources and sources.strip():
+                    source_lines = sources.strip().split('\n')
+                    for line in source_lines:
+                        if line.strip():  # Skip empty lines
+                            # Parse page and section if available (format might be "filename Page: X:Y")
+                            file_parts = line.split(" Page: ")
+                            filename = file_parts[0]
+
+                            # Extract page and section if available
+                            page = "-"
+                            section = "-"
+                            if len(file_parts) > 1 and ":" in file_parts[1]:
+                                page_section = file_parts[1].split(":")
+                                page = page_section[0]
+                                section = page_section[1] if len(page_section) > 1 else "-"
+
+                            source_filenames.append((filename, page, section))
+
+            # Create markdown table
+            markdown_table = "\n\n**Sources**\n\n| Filename | Page | Section |\n| -------- | ---- | ------- |\n"
+            for filename, page, section in source_filenames:
+                markdown_table += f"| {filename} | {page} | {section} |\n"
+
+            formatted_sources = markdown_table
             llm.get_num_tokens(context)
+
         prompt = make_prompt(input, context)
         chain = prompt | llm
         chain_with_message_history = RunnableWithMessageHistory(
@@ -55,14 +79,12 @@ class Session:
             history_messages_key="chat_history",
         )
 
-        # response = ""
+        # Stream the model's response
         for chunk in chain_with_message_history.stream({"input": input}):
-            # print(chunk.content, end="")
             yield chunk.content
-            # response += chunk.content
 
-        if (formatted_sources != None):
-            # response += formatted_sources
+        # After the model finishes, yield the sources if available
+        if formatted_sources is not None:
             yield formatted_sources
 
         self.num_exchanges += 1
