@@ -38,12 +38,16 @@ class Uploaded_data:
     def __init__(self, name, data_path):
         self.name = name
         self.data_path = data_path
+
+        # Create a unique database path with timestamp
+        self.timestamp = int(time.time() * 1000)  # millisecond precision
+        self.vector_database_path = f"{name}_{self.timestamp}"
+
         start_time = time.time()
         self.documents = self.load_documents(data_path)
         end_time = time.time()
         print(f"Execution time for load documents is: {end_time - start_time:.6f} seconds")
         self.data_summary = ""
-        self.vector_database_path = str(name)
         self.add_to_chroma()
 
     #   Accepted file types .pdf, .txt, .md, .docx, .pptx, .xlsx, .csv, .json
@@ -260,12 +264,30 @@ class Uploaded_data:
 
     def get_db_path(self):
         """Get the vector database path for this uploaded data"""
-        return self.get_project_root() / 'storage' / 'db_store' / self.name
+        # Use the timestamped path instead of just the name
+        return self.get_project_root() / 'storage' / 'db_store' / self.vector_database_path
 
     @staticmethod
     def delete_vector_db(filename):
-        db_path = Uploaded_data.get_project_root() / 'storage' / 'db_store' / filename
+        """
+        Instead of trying to delete a specific database, this method now
+        finds and deletes all databases associated with a filename.
+        """
+        # Find all database directories that match the filename pattern
+        db_root = Uploaded_data.get_project_root() / 'storage' / 'db_store'
 
-        if os.path.exists(str(db_path)):
-            shutil.rmtree(str(db_path))
-            print("Clearing Database")
+        # List all directories that start with the filename
+        matching_dbs = [d for d in os.listdir(str(db_root))
+                        if d.startswith(filename + "_") or d == filename]
+
+        for db_name in matching_dbs:
+            db_path = db_root / db_name
+            if os.path.exists(str(db_path)):
+                try:
+                    # Simple deletion - we don't need complex logic anymore
+                    # since we're using unique paths
+                    import shutil
+                    shutil.rmtree(str(db_path))
+                    print(f"Deleted database: {db_path}")
+                except Exception as e:
+                    print(f"Error deleting database {db_path}: {e}")
