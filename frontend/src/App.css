@@ -262,6 +262,7 @@ body {
 .files-section h3 {
   color: var(--text-color);
   font-size: var(--h4-size);
+  font-family: Roboto, Arial;
   margin-bottom: 1rem;
 }
 

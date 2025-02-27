@@ -436,7 +436,7 @@ const Home: React.FC = () => {
                 ) : (
                   <div key={index} className="bot-message-container">
                     <div className="bot-pfp">
-                      <img src="boots.jpeg" alt="Bot" className="bot-logo" />
+                      <img src="Herma.jpeg" alt="Bot" className="bot-logo" />
                     </div>
                     <div className="message bot-message">
                       <div className="rich-text" dangerouslySetInnerHTML={{ __html: msg.htmlContent || '' }} />
