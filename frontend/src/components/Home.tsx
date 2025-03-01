@@ -37,10 +37,23 @@ const Home: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const[showAlert, setShowAlert] = useState(false);
 
+  const [autoScroll, setAutoScroll] = useState(true);
+  const messageDisplayRef = useRef<HTMLDivElement | null>(null);
   const messageEndRef = useRef<HTMLDivElement | null>(null);
+  const isNearBottomRef = useRef(true);
 
   const scrollToBottom = () => {
-    messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messageEndRef.current && autoScroll) {
+      messageEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  };
+
+  const checkIfNearBottom = () => {
+    if (messageDisplayRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = messageDisplayRef.current;
+      return scrollHeight - scrollTop - clientHeight < 50;
+    }
+    return true;
   };
 
       // First, add a new function to reset everything
@@ -51,7 +64,6 @@ const Home: React.FC = () => {
       setHasStarted(false);
       // Clear selected files
       setSelectedFiles([]);
-
       try {
         // Tell the backend to reset the session
         await ipcRenderer.invoke('new-session');
@@ -60,9 +72,45 @@ const Home: React.FC = () => {
       }
     };
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]); // Auto-scroll whenever messages are updated
+    useEffect(() => {
+      // When user sends a message, always scroll to bottom
+      const isNewUserMessage = 
+        messages.length > 0 && 
+        messages[messages.length - 1].isUser;
+      
+      if (isNewUserMessage) {
+        setAutoScroll(true);
+        scrollToBottom();
+      } else if (autoScroll) {
+        // Only scroll if auto-scroll is enabled
+        scrollToBottom();
+      }
+    }, [messages, autoScroll]);
+
+    useEffect(() => {
+      const messageDisplay = messageDisplayRef.current;
+      if (!messageDisplay) return;
+    
+      const handleScroll = () => {
+        const isNearBottom = checkIfNearBottom();
+        isNearBottomRef.current = isNearBottom;
+        
+        // If user manually scrolls to bottom during loading, re-enable auto-scroll
+        if (isNearBottom && loading) {
+          setAutoScroll(true);
+        }
+        
+        // If user scrolls away from bottom during loading, disable auto-scroll
+        if (!isNearBottom && loading) {
+          setAutoScroll(false);
+        }
+      };
+      
+      messageDisplay.addEventListener('scroll', handleScroll);
+      return () => {
+        messageDisplay.removeEventListener('scroll', handleScroll);
+      };
+    }, [loading]);
 
   const handleChatInput = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     const textarea = event.target;
@@ -83,7 +131,13 @@ const Home: React.FC = () => {
 
   useEffect(() => {
     const messageHandler = (_event: any, chunk: string) => {
-      setLoading(false)
+      const wasNearBottom = checkIfNearBottom();
+
+      if (chunk === '[DONE]') {
+        setLoading(false);
+        return;
+      }
+
       setMessages(prevMessages => {
         const lastMessage = prevMessages[prevMessages.length - 1];
         if (lastMessage && !lastMessage.isUser) {
@@ -104,6 +158,12 @@ const Home: React.FC = () => {
           }];
         }
       });
+      setAutoScroll(wasNearBottom);
+    
+      // If we're at the end of message streaming, set loading to false
+      if (chunk.length < 10) { // typically, last chunks are smaller
+        setLoading(false);
+      }
     };
 
     ipcRenderer.on('chat-response', messageHandler);
@@ -427,7 +487,7 @@ const Home: React.FC = () => {
       <div className="center">
         {hasStarted ? (
           <div className="chat-container">
-            <div className="message-display">
+            <div className="message-display" ref={messageDisplayRef}>
               {messages.map((msg, index) => (
                 msg.isUser ? (
                   <div key={index} className="message user-message">
@@ -445,7 +505,7 @@ const Home: React.FC = () => {
                 )
               ))}
               {loading && <LoadingMessage />}
-              <div ref={messageEndRef} />
+            <div ref={messageEndRef} />
             </div>
             <form className="chat-form" onSubmit={handleSubmit}>
               <div className="input-bar-buttons">
