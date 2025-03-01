@@ -124,6 +124,23 @@ const Home: React.FC = () => {
     textarea.style.height = `${newHeight}px`;
   };
 
+  const handleSidebarToggle = () => {
+    // Toggle the sidebar state
+    setIsSidebarOpen(!isSidebarOpen);
+    
+    // When toggling to open on small screens, we need to ensure the container class is updated
+    const sidebarContainer = document.querySelector('.sidebar-container');
+    if (sidebarContainer) {
+      if (!isSidebarOpen) {
+        // Opening the sidebar
+        sidebarContainer.classList.remove('closed');
+      } else {
+        // Closing the sidebar
+        sidebarContainer.classList.add('closed');
+      }
+    }
+  };
+
   // Handle image upload
   const isImage = (filename: string) => {
     return /\.(jpg|jpeg|png|gif)$/i.test(filename);
@@ -454,7 +471,7 @@ const Home: React.FC = () => {
         <div className="sidebar-controls">
           <button
             className="sidebar-toggle"
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            onClick={handleSidebarToggle}
             data-tooltip={isSidebarOpen ? "Hide sidebar" : "Show sidebar"}
           >
             <svg
