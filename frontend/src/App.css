@@ -344,7 +344,7 @@ body {
 }
 
 /* Responsive Design */
-@media (max-width: 1400px) {
+@media (max-width: 1200px) {
   .root {
     --chat-min-width: 80%;
   }
