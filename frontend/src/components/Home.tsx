@@ -189,47 +189,72 @@ const Home: React.FC = () => {
     };
   }, []);
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const file = event.target.files?.[0];
+  if (!file) return;
 
-    const validTypes = [
-      '.pdf', '.txt', '.md', '.docx', '.pptx',
-      '.xlsx', '.csv', '.json'
-    ];
+  const validTypes = [
+    '.pdf', '.txt', '.md', '.docx', '.pptx',
+    '.xlsx', '.csv', '.json'
+  ];
 
-    const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
-    if (!validTypes.includes(fileExtension)) {
-      setShowAlert(true);
+  const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
+  if (!validTypes.includes(fileExtension)) {
+    setShowAlert(true);
+    event.target.value = ''; // Clear the file input
+    return;
+  }
+
+  // Check if file already exists
+  if (uploadedFiles.includes(file.name)) {
+    const confirmReplace = window.confirm(
+      `File "${file.name}" already exists. Would you like to replace it?`
+    );
+
+    if (!confirmReplace) {
       event.target.value = ''; // Clear the file input
       return;
     }
 
-    setIsUploading(true);
+    // If user confirms replacement, proceed with delete + upload flow
     try {
-      const buffer = await file.arrayBuffer();
-
-      setUploadedFiles(prev => [...prev, file.name]);
-      setSelectedFiles(prev => [...prev, file.name]);
-
-      await ipcRenderer.invoke('upload-file', {
-        filename: file.name,
-        data: Buffer.from(buffer)
-      });
-
-      const files = await ipcRenderer.invoke('get-files');
-      setUploadedFiles(files);
-
-      setSelectedFiles(prev => [...prev, file.name]);
-      await ipcRenderer.invoke('select-files', {
-        filenames: [...selectedFiles, file.name]
+      // First delete the existing file
+      await ipcRenderer.invoke('delete-file', {
+        filename: file.name
       });
     } catch (error) {
-      console.error("Error uploading file:", error);
-    } finally {
-      setIsUploading(false);
+      console.error("Error deleting existing file:", error);
+      event.target.value = ''; // Clear the file input
+      return;
     }
-  };
+  }
+
+  setIsUploading(true);
+  try {
+    const buffer = await file.arrayBuffer();
+
+    setUploadedFiles(prev => [...prev, file.name]);
+    setSelectedFiles(prev => [...prev, file.name]);
+
+    await ipcRenderer.invoke('upload-file', {
+      filename: file.name,
+      data: Buffer.from(buffer)
+    });
+
+    const files = await ipcRenderer.invoke('get-files');
+    setUploadedFiles(files);
+
+    setSelectedFiles(prev => [...prev, file.name]);
+    await ipcRenderer.invoke('select-files', {
+      filenames: [...selectedFiles, file.name]
+    });
+  } catch (error) {
+    console.error("Error uploading file:", error);
+  } finally {
+    setIsUploading(false);
+    event.target.value = ''; // Clear the file input
+  }
+};
 
   const fetchAndSelectFiles = async () => {
     try {
