@@ -229,6 +229,10 @@ body {
   justify-content: center;
   transition: background-color 0.2s ease;
   z-index: 1600;
+
+  width: 36px;
+  height: 36px;
+  margin: 0 2px;
 }
 
 
@@ -380,8 +384,12 @@ body {
   }
 
   .sidebar-controls {
-    flex-direction: row; /* Force row direction */
-    transform: translateX(275%);
+    flex-direction: column; /* Force row direction */
+    right: 10px;
+    left: auto;
+    position: fixed;
+    top: 2rem;
+    /*transform: translateX(275%);*/
     z-index: 1700;
   }
 
@@ -403,7 +411,7 @@ body {
 
   .sidebar-closed + .sidebar-controls {
     flex-direction: column;
-  }
+  } 
 }
 /************* Sidebar ****************/
 
