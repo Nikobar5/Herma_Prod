@@ -59,12 +59,31 @@ const Home: React.FC = () => {
 
       // First, add a new function to reset everything
     const handleNewChat = async () => {
+      // Interrupt any ongoing response first
+      if (loading || isStreaming) {
+        try {
+          await ipcRenderer.invoke('interrupt-chat');
+        } catch (error) {
+          console.error("Error interrupting chat:", error);
+        }
+      }
+
+      // Clear input text
+      setChatMessage("");
+
+      // Reset states
+      setLoading(false);
+      setIsStreaming(false);
+
       // Clear messages
       setMessages([]);
+
       // Reset hasStarted state
       setHasStarted(false);
+
       // Clear selected files
       setSelectedFiles([]);
+
       try {
         // Tell the backend to reset the session
         await ipcRenderer.invoke('new-session');
