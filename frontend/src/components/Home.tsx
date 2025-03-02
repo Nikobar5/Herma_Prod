@@ -183,12 +183,6 @@ const messageHandler = (_event: any, chunk: string) => {
     }
   });
   setAutoScroll(wasNearBottom);
-
-  // If we're at the end of message streaming, set loading and streaming to false
-  if (chunk.length < 10) { // typically, last chunks are smaller
-    setLoading(false);
-    setIsStreaming(false);
-  }
 };
 
     ipcRenderer.on('chat-response', messageHandler);
@@ -562,26 +556,26 @@ const handleSubmit = async (event: React.FormEvent) => {
       <div className="center">
         {hasStarted ? (
           <div className="chat-container">
-            <div className="message-display" ref={messageDisplayRef}>
-              {messages.map((msg, index) => (
-                msg.isUser ? (
-                  <div key={index} className="message user-message">
-                    <div className="rich-text" dangerouslySetInnerHTML={{ __html: msg.text }} />
-                  </div>
-                ) : (
-                  <div key={index} className="bot-message-container">
-                    <div className="bot-pfp">
-                      <img src="Herma.jpeg" alt="Bot" className="bot-logo" />
-                    </div>
-                    <div className="message bot-message">
-                      <div className="rich-text" dangerouslySetInnerHTML={{ __html: msg.htmlContent || '' }} />
-                    </div>
-                  </div>
-                )
-              ))}
-              {loading && <LoadingMessage />}
-            <div ref={messageEndRef} />
-            </div>
+                <div className="message-display" ref={messageDisplayRef}>
+                  {messages.map((msg, index) => (
+                    msg.isUser ? (
+                      <div key={index} className="message user-message">
+                        <div className="rich-text" dangerouslySetInnerHTML={{ __html: msg.text }} />
+                      </div>
+                    ) : (
+                      <div key={index} className="bot-message-container">
+                        <div className="bot-pfp">
+                          <img src="Herma.jpeg" alt="Bot" className="bot-logo" />
+                        </div>
+                        <div className="message bot-message">
+                          <div className="rich-text" dangerouslySetInnerHTML={{ __html: msg.htmlContent || '' }} />
+                        </div>
+                      </div>
+                    )
+                  ))}
+                  {loading && !isStreaming && <LoadingMessage />} {/* Only show loading when loading but not streaming */}
+                  <div ref={messageEndRef} />
+                </div>
  <form className="chat-form" onSubmit={handleSubmit}>
   <div className="input-bar-buttons">
     <div className="input-container">
