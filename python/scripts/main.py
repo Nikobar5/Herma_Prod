@@ -11,6 +11,7 @@ import platform
 
 class PythonServer:
     def __init__(self):
+        self.active_requests = {}
         root_dir = Path(__file__).parent.parent.parent  # Go up to project root
         self.storage_dir = root_dir / "storage"
         self.upload_dir = self.storage_dir / "uploads"
@@ -68,22 +69,47 @@ class PythonServer:
         }), flush=True)
 
     def process_chat(self, message, request_id):
-        """Handle chat messages - keeping existing implementation"""
+        """Handle chat messages with support for interruption"""
         try:
-            for chunk in self.session.ask(message):
+            # Track this request
+            self.active_requests[request_id] = "active"
+
+            # Start the generator for chat response
+            response_generator = self.session.ask(message)
+
+            for chunk in response_generator:
+                # Check if this request has been interrupted
+                if self.active_requests.get(request_id) == "interrupted":
+                    # If interrupted, we'll stop sending more chunks
+                    print(json.dumps({
+                        "requestId": request_id,
+                        "done": True
+                    }), flush=True)
+                    # Clean up
+                    self.active_requests.pop(request_id, None)
+                    return
+
+                # Send the chunk as usual
                 print(json.dumps({
                     "requestId": request_id,
                     "chunk": chunk
                 }), flush=True)
+
+            # Normal completion - not interrupted
             print(json.dumps({
                 "requestId": request_id,
                 "done": True
             }), flush=True)
+
+            # Clean up
+            self.active_requests.pop(request_id, None)
         except Exception as e:
             print(json.dumps({
                 "requestId": request_id,
                 "error": str(e)
             }), flush=True)
+            # Clean up
+            self.active_requests.pop(request_id, None)
 
     def handle_shutdown(self, request_id):
         """Handle shutdown command"""
@@ -154,6 +180,27 @@ class PythonServer:
             print(json.dumps({
                 "requestId": request_id,
                 "error": f"Selection failed: {str(e)}"
+            }), flush=True)
+
+    def handle_interrupt(self, request_id, data):
+        """Handle request to interrupt an ongoing operation"""
+        try:
+            target_request_id = data.get('requestId')
+            if not target_request_id:
+                raise ValueError("Missing target requestId")
+
+            # Mark this request for interruption
+            self.active_requests[target_request_id] = "interrupted"
+
+            print(json.dumps({
+                "requestId": request_id,
+                "success": True,
+                "done": True
+            }), flush=True)
+        except Exception as e:
+            print(json.dumps({
+                "requestId": request_id,
+                "error": f"Interrupt failed: {str(e)}"
             }), flush=True)
 
     def handle_delete(self, request_id, data):
@@ -255,6 +302,8 @@ class PythonServer:
                     self.process_chat(payload['message'], request_id)
                 elif command == 'upload':
                     self.handle_upload(request_id, payload)
+                elif command == 'interrupt':
+                    self.handle_interrupt(request_id, payload)
                 elif command == 'delete':
                     self.handle_delete(request_id, payload)
                 elif command == 'select':

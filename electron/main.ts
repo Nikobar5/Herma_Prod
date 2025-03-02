@@ -42,6 +42,7 @@ const PYTHON_DIR = path.join(__dirname, '../../python/scripts');
 
 // Python process state
 let pythonProcess: ReturnType<typeof spawn> | null = null;
+let activeChatRequestId: string | null = null;
 const messageCallbacks = new Map<string, MessageCallback>();
 let requestCounter = 0;
 let buffer = '';
@@ -195,37 +196,42 @@ async function setupIPC() {
   await initializePythonShell();
 
   // Chat handler
-  ipcMain.handle('start-chat', async (event: Electron.IpcMainInvokeEvent, { message }: ChatMessage) => {
-    await ensurePythonShell();
-    const requestId = (++requestCounter).toString();
+ipcMain.handle('start-chat', async (event: Electron.IpcMainInvokeEvent, { message }: ChatMessage) => {
+  await ensurePythonShell();
+  const requestId = (++requestCounter).toString();
 
-    return new Promise((resolve, reject) => {
-      messageCallbacks.set(requestId, (response: PythonMessage) => {
-        if (response.error) {
-          messageCallbacks.delete(requestId);
-          reject(new Error(response.error));
-        } else if (response.chunk) {
-          event.sender.send('chat-response', response.chunk);
-        } else if (response.done) {
-          messageCallbacks.delete(requestId);
-          resolve(null);
-        }
-      });
+  // Store the active chat request ID
+  activeChatRequestId = requestId;
 
-      if (!pythonProcess) {
-        reject(new Error('Python process not available'));
-        return;
+  return new Promise((resolve, reject) => {
+    messageCallbacks.set(requestId, (response: PythonMessage) => {
+      if (response.error) {
+        messageCallbacks.delete(requestId);
+        activeChatRequestId = null; // Clear active request on error
+        reject(new Error(response.error));
+      } else if (response.chunk) {
+        event.sender.send('chat-response', response.chunk);
+      } else if (response.done) {
+        messageCallbacks.delete(requestId);
+        activeChatRequestId = null; // Clear active request when done
+        resolve(null);
       }
-
-      pythonProcess.stdin.write(
-        JSON.stringify({
-          requestId,
-          command: 'chat',
-          data: { message }
-        }) + '\n'
-      );
     });
+
+    if (!pythonProcess) {
+      reject(new Error('Python process not available'));
+      return;
+    }
+
+    pythonProcess.stdin.write(
+      JSON.stringify({
+        requestId,
+        command: 'chat',
+        data: { message }
+      }) + '\n'
+    );
   });
+});
 
   // File upload handler
   ipcMain.handle('upload-file', async (_event: Electron.IpcMainInvokeEvent, { filename, data }: FileUpload) => {
@@ -335,6 +341,45 @@ async function setupIPC() {
       );
     });
   });
+
+  ipcMain.handle('interrupt-chat', async () => {
+  if (!activeChatRequestId || !pythonProcess) {
+    return { success: false, message: 'No active chat to interrupt' };
+  }
+
+  try {
+    // Send an interrupt signal to Python
+    pythonProcess.stdin.write(
+      JSON.stringify({
+        requestId: 'interrupt-' + activeChatRequestId,
+        command: 'interrupt',
+        data: { requestId: activeChatRequestId }
+      }) + '\n'
+    );
+
+    // Mark the request as done
+    const callback = messageCallbacks.get(activeChatRequestId);
+    if (callback) {
+      callback({
+        requestId: activeChatRequestId,
+        done: true
+      });
+      messageCallbacks.delete(activeChatRequestId);
+    }
+
+    // Send a [DONE] message to the renderer
+    const windows = BrowserWindow.getAllWindows();
+    windows.forEach((window: Electron.BrowserWindow) => {
+      window.webContents.send('chat-response', '[DONE]');
+    });
+
+    activeChatRequestId = null;
+    return { success: true };
+  } catch (error) {
+    console.error('Error interrupting chat:', error);
+    return { success: false, message: String(error) };
+  }
+});
 
   ipcMain.handle('open-file', async (_event: Electron.IpcMainInvokeEvent, { filename }: { filename: string }) => {
     try {

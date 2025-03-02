@@ -879,6 +879,30 @@ body {
 .rich-text th {
   background-color: rgba(0, 0, 0, 0.05);
 }
+
+.interrupt-button {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  color: var(--text-color);
+  transition: color 0.2s ease;
+}
+
+.interrupt-button:hover {
+  color: #ef4444; /* Red color on hover to indicate stopping */
+}
+
+/* Optional animation for the interrupt button to make it more noticeable */
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+.interrupt-button svg {
+  animation: pulse 2s infinite;
+}
 /*
 .rich-text ul {
   list-style-type: disc;

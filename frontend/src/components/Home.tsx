@@ -36,6 +36,7 @@ const Home: React.FC = () => {
   const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const[showAlert, setShowAlert] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
 
   const [autoScroll, setAutoScroll] = useState(true);
   const messageDisplayRef = useRef<HTMLDivElement | null>(null);
@@ -74,10 +75,10 @@ const Home: React.FC = () => {
 
     useEffect(() => {
       // When user sends a message, always scroll to bottom
-      const isNewUserMessage = 
-        messages.length > 0 && 
+      const isNewUserMessage =
+        messages.length > 0 &&
         messages[messages.length - 1].isUser;
-      
+
       if (isNewUserMessage) {
         setAutoScroll(true);
         scrollToBottom();
@@ -90,22 +91,22 @@ const Home: React.FC = () => {
     useEffect(() => {
       const messageDisplay = messageDisplayRef.current;
       if (!messageDisplay) return;
-    
+
       const handleScroll = () => {
         const isNearBottom = checkIfNearBottom();
         isNearBottomRef.current = isNearBottom;
-        
+
         // If user manually scrolls to bottom during loading, re-enable auto-scroll
         if (isNearBottom && loading) {
           setAutoScroll(true);
         }
-        
+
         // If user scrolls away from bottom during loading, disable auto-scroll
         if (!isNearBottom && loading) {
           setAutoScroll(false);
         }
       };
-      
+
       messageDisplay.addEventListener('scroll', handleScroll);
       return () => {
         messageDisplay.removeEventListener('scroll', handleScroll);
@@ -127,7 +128,7 @@ const Home: React.FC = () => {
   const handleSidebarToggle = () => {
     // Toggle the sidebar state
     setIsSidebarOpen(!isSidebarOpen);
-    
+
     // When toggling to open on small screens, we need to ensure the container class is updated
     const sidebarContainer = document.querySelector('.sidebar-container');
     if (sidebarContainer) {
@@ -147,41 +148,48 @@ const Home: React.FC = () => {
   };
 
   useEffect(() => {
-    const messageHandler = (_event: any, chunk: string) => {
-      const wasNearBottom = checkIfNearBottom();
+const messageHandler = (_event: any, chunk: string) => {
+  const wasNearBottom = checkIfNearBottom();
 
-      if (chunk === '[DONE]') {
-        setLoading(false);
-        return;
-      }
+  if (chunk === '[DONE]') {
+    setLoading(false);
+    setIsStreaming(false);
+    return;
+  }
 
-      setMessages(prevMessages => {
-        const lastMessage = prevMessages[prevMessages.length - 1];
-        if (lastMessage && !lastMessage.isUser) {
-          const updatedText = lastMessage.text + chunk;
-          return [
-            ...prevMessages.slice(0, -1),
-            {
-              ...lastMessage,
-              text: updatedText,
-              htmlContent: marked(updatedText)
-            }
-          ];
-        } else {
-          return [...prevMessages, {
-            text: chunk,
-            htmlContent: marked(chunk),
-            isUser: false
-          }];
+  // If this is the first chunk, set isStreaming to true
+  if (!isStreaming) {
+    setIsStreaming(true);
+  }
+
+  setMessages(prevMessages => {
+    const lastMessage = prevMessages[prevMessages.length - 1];
+    if (lastMessage && !lastMessage.isUser) {
+      const updatedText = lastMessage.text + chunk;
+      return [
+        ...prevMessages.slice(0, -1),
+        {
+          ...lastMessage,
+          text: updatedText,
+          htmlContent: marked(updatedText)
         }
-      });
-      setAutoScroll(wasNearBottom);
-    
-      // If we're at the end of message streaming, set loading to false
-      if (chunk.length < 10) { // typically, last chunks are smaller
-        setLoading(false);
-      }
-    };
+      ];
+    } else {
+      return [...prevMessages, {
+        text: chunk,
+        htmlContent: marked(chunk),
+        isUser: false
+      }];
+    }
+  });
+  setAutoScroll(wasNearBottom);
+
+  // If we're at the end of message streaming, set loading and streaming to false
+  if (chunk.length < 10) { // typically, last chunks are smaller
+    setLoading(false);
+    setIsStreaming(false);
+  }
+};
 
     ipcRenderer.on('chat-response', messageHandler);
     return () => {
@@ -255,6 +263,30 @@ const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     event.target.value = ''; // Clear the file input
   }
 };
+const handleInterrupt = async () => {
+  // If we haven't started streaming yet, add a cancelled message
+  if (loading && !isStreaming) {
+    setMessages(prevMessages => [
+      ...prevMessages,
+      {
+        text: "Response cancelled",
+        htmlContent: marked("Response cancelled"),
+        isUser: false
+      }
+    ]);
+  }
+
+  // Signal to backend to stop processing
+  try {
+    await ipcRenderer.invoke('interrupt-chat');
+  } catch (error) {
+    console.error("Error interrupting chat:", error);
+  }
+
+  // Reset states
+  setLoading(false);
+  setIsStreaming(false);
+};
 
   const fetchAndSelectFiles = async () => {
     try {
@@ -309,35 +341,36 @@ const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     fetchAndSelectFiles();
   }, []);
 
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!chatMessage.trim()) return;
+const handleSubmit = async (event: React.FormEvent) => {
+  event.preventDefault();
+  if (!chatMessage.trim()) return;
 
-    const currentMessage = chatMessage;
-    const userMessage: Message = { text: currentMessage, isUser: true };
-    setMessages(prevMessages => [...prevMessages, userMessage]);
-    setLoading(true);
-    setChatMessage("");
-    setHasStarted(true);
+  const currentMessage = chatMessage;
+  const userMessage: Message = { text: currentMessage, isUser: true };
+  setMessages(prevMessages => [...prevMessages, userMessage]);
+  setLoading(true);
+  setIsStreaming(false); // Reset streaming state
+  setChatMessage("");
+  setHasStarted(true);
 
-    const textarea = document.querySelector('.chat-input') as HTMLTextAreaElement;
-    if (textarea) {
-      textarea.style.height = 'auto';
-    }
+  const textarea = document.querySelector('.chat-input') as HTMLTextAreaElement;
+  if (textarea) {
+    textarea.style.height = 'auto';
+  }
 
-    try {
-      console.log("Attempting to send message:", currentMessage);
-      await ipcRenderer.invoke('start-chat', { message: currentMessage });
-    } catch (error) {
-      console.error("Error sending message:", error);
-      setMessages(prevMessages => [
-        ...prevMessages,
-        { text: marked("❌ Error: Failed to send message") as string, isUser: false }
-      ]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  try {
+    console.log("Attempting to send message:", currentMessage);
+    await ipcRenderer.invoke('start-chat', { message: currentMessage });
+  } catch (error) {
+    console.error("Error sending message:", error);
+    setMessages(prevMessages => [
+      ...prevMessages,
+      { text: marked("❌ Error: Failed to send message") as string, isUser: false }
+    ]);
+  } finally {
+    // Note: Don't reset loading here, it will be handled by the messageHandler
+  }
+};
 
   const handleKeyPress = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter' && !event.shiftKey) {
@@ -549,61 +582,80 @@ const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
               {loading && <LoadingMessage />}
             <div ref={messageEndRef} />
             </div>
-            <form className="chat-form" onSubmit={handleSubmit}>
-              <div className="input-bar-buttons">
-                <div className="input-container">
-                <textarea
-                  placeholder="Ask Herma Anything!"
-                  value={chatMessage}
-                  onChange={handleChatInput}
-                  onKeyPress={handleKeyPress}
-                  className="chat-input"
-                  disabled={loading || isUploading}
-                  rows={1}
-                  style={{ height: 'auto' }}
-                />
-                </div>
-                <div className="chat-buttons-container">
-                    <label className="upload-button"
-                      data-tooltip="Select files to upload">
-                      <input
-                        type="file"
-                        onChange={handleFileUpload}
-                        accept=".pdf,.txt,.md,.docx,.pptx,.xlsx,.csv,.json"
-                        style={{ display: "none" }}
-                      />
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
-                        width="25"
-                        height="25"
-                      >
-                        <path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10zM8 13.01l1.41 1.41L11 12.84V17h2v-4.16l1.59 1.59L16 13.01 12.01 9 8 13.01z"/>
-                      </svg>
-                    </label>
-                    <button
-                      type="submit"
-                      className="submit-button"
-                      disabled={loading || isUploading}
-                      data-tooltip="Ask Herma"
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
-                        width="25"
-                        height="25"
-                      >
-                        <path d="M2 21l21-9L2 3v7l15 2-15 2v7z" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-                <div className="accuracy-disclaimer">
-                  Herma isn't perfect. Always verify important information.
-                </div>
-            </form>
+ <form className="chat-form" onSubmit={handleSubmit}>
+  <div className="input-bar-buttons">
+    <div className="input-container">
+      <textarea
+        placeholder="Ask Herma Anything!"
+        value={chatMessage}
+        onChange={handleChatInput}
+        onKeyPress={handleKeyPress}
+        className="chat-input"
+        disabled={loading || isUploading}
+        rows={1}
+        style={{ height: 'auto' }}
+      />
+    </div>
+    <div className="chat-buttons-container">
+      <label className="upload-button" data-tooltip="Select files to upload">
+        <input
+          type="file"
+          onChange={handleFileUpload}
+          accept=".pdf,.txt,.md,.docx,.pptx,.xlsx,.csv,.json"
+          style={{ display: "none" }}
+        />
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          width="25"
+          height="25"
+        >
+          <path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10zM8 13.01l1.41 1.41L11 12.84V17h2v-4.16l1.59 1.59L16 13.01 12.01 9 8 13.01z"/>
+        </svg>
+      </label>
+
+      {isStreaming ? (
+        <button
+          type="button"
+          className="interrupt-button"
+          onClick={handleInterrupt}
+          data-tooltip="Stop response"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            width="25"
+            height="25"
+          >
+            <path d="M6 6h12v12H6z" />
+          </svg>
+        </button>
+      ) : (
+        <button
+          type="submit"
+          className="submit-button"
+          disabled={loading || isUploading}
+          data-tooltip="Ask Herma"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            width="25"
+            height="25"
+          >
+            <path d="M2 21l21-9L2 3v7l15 2-15 2v7z" />
+          </svg>
+        </button>
+      )}
+    </div>
+  </div>
+  <div className="accuracy-disclaimer">
+    Herma isn't perfect. Always verify important information.
+  </div>
+</form>
           </div>
         ) : (
           <div className="centered-start">
@@ -643,22 +695,41 @@ const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
                   </svg>
 
                   </label>
-                  <button
-                    type="submit"
-                    className="submit-button"
-                    disabled={loading || isUploading}
-                    data-tooltip="Ask Herma"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 24 24"
-                      fill="currentColor"
-                      width="25"
-                      height="25"
-                    >
-                      <path d="M2 21l21-9L2 3v7l15 2-15 2v7z" />
-                    </svg>
-                  </button>
+                  {isStreaming ? (
+                      <button
+                        type="button"
+                        className="interrupt-button"
+                        onClick={handleInterrupt}
+                        data-tooltip="Stop response"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          viewBox="0 0 24 24"
+                          fill="currentColor"
+                          width="25"
+                          height="25"
+                        >
+                          <path d="M6 6h12v12H6z" />
+                        </svg>
+                      </button>
+                    ) : (
+                      <button
+                        type="submit"
+                        className="submit-button"
+                        disabled={loading || isUploading}
+                        data-tooltip="Ask Herma"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          viewBox="0 0 24 24"
+                          fill="currentColor"
+                          width="25"
+                          height="25"
+                        >
+                          <path d="M2 21l21-9L2 3v7l15 2-15 2v7z" />
+                        </svg>
+                      </button>
+                    )}
             </form>
           </div>
         )}

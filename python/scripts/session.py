@@ -30,6 +30,9 @@ class Session:
 
     # Takes user input and prints response, langchain handles conversation history
     def ask(self, input):
+        """
+        Takes user input and streams response, langchain handles conversation history
+        """
         # Instantiates the llm to be used, setting the model and context window, other params can also be adjusted
         llm = ChatOllama(model="llama3.2:1b", num_ctx=5000)
         # Get context from all uploaded files selected
@@ -80,11 +83,13 @@ class Session:
         )
 
         # Stream the model's response
+        content_yielded = False
         for chunk in chain_with_message_history.stream({"input": input}):
+            content_yielded = True
             yield chunk.content
 
         # After the model finishes, yield the sources if available
-        if formatted_sources is not None:
+        if formatted_sources is not None and content_yielded:
             yield formatted_sources
 
         self.num_exchanges += 1
