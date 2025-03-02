@@ -205,6 +205,7 @@ ipcMain.handle('start-chat', async (event: Electron.IpcMainInvokeEvent, { messag
 
   return new Promise((resolve, reject) => {
     messageCallbacks.set(requestId, (response: PythonMessage) => {
+      console.log("Electron received from Python:", response);  // Add this debug line
       if (response.error) {
         messageCallbacks.delete(requestId);
         activeChatRequestId = null; // Clear active request on error
@@ -212,6 +213,8 @@ ipcMain.handle('start-chat', async (event: Electron.IpcMainInvokeEvent, { messag
       } else if (response.chunk) {
         event.sender.send('chat-response', response.chunk);
       } else if (response.done) {
+        console.log("Electron received 'done' signal, sending [DONE] to frontend");
+        event.sender.send('chat-response', '[DONE]');
         messageCallbacks.delete(requestId);
         activeChatRequestId = null; // Clear active request when done
         resolve(null);

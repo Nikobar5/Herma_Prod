@@ -150,8 +150,9 @@ const Home: React.FC = () => {
   useEffect(() => {
 const messageHandler = (_event: any, chunk: string) => {
   const wasNearBottom = checkIfNearBottom();
-
+  console.log("Received chunk:", chunk);
   if (chunk === '[DONE]') {
+    console.log("Received DONE signal, stopping stream");
     setLoading(false);
     setIsStreaming(false);
     return;

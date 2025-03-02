@@ -100,7 +100,11 @@ class PythonServer:
                 "requestId": request_id,
                 "done": True
             }), flush=True)
-
+            print(json.dumps({
+                "requestId": request_id,
+                "done": True  # This is what signals Electron we're finished
+            }), flush=True)
+            print("DEBUG: Python sent done signal", flush=True)
             # Clean up
             self.active_requests.pop(request_id, None)
         except Exception as e:
