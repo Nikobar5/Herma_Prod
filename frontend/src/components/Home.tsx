@@ -610,7 +610,7 @@ const handleSubmit = async (event: React.FormEvent) => {
         </svg>
       </label>
 
-      {isStreaming ? (
+      {(loading || isStreaming) ? (
         <button
           type="button"
           className="interrupt-button"
