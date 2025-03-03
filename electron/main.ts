@@ -351,6 +351,8 @@ ipcMain.handle('start-chat', async (event: Electron.IpcMainInvokeEvent, { messag
   }
 
   try {
+    console.log("Interrupting chat:", activeChatRequestId);
+
     // Send an interrupt signal to Python
     pythonProcess.stdin.write(
       JSON.stringify({
@@ -370,11 +372,14 @@ ipcMain.handle('start-chat', async (event: Electron.IpcMainInvokeEvent, { messag
       messageCallbacks.delete(activeChatRequestId);
     }
 
-    // Send a [DONE] message to the renderer
+    // Send a [DONE] message to the renderer to signal completion
     const windows = BrowserWindow.getAllWindows();
     windows.forEach((window: Electron.BrowserWindow) => {
       window.webContents.send('chat-response', '[DONE]');
     });
+
+    // Add a brief delay to allow proper cleanup
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     activeChatRequestId = null;
     return { success: true };

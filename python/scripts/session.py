@@ -21,6 +21,7 @@ class Session:
         self.num_exchanges = 0
         # List of uploaded_data that is being used
         self.currently_used_data = currently_used_data
+        self._cancel_generation = False
 
     # Retrieves chat history from whatever session you are in or creates a new session chat history
     def get_chat_history(self):
@@ -33,6 +34,7 @@ class Session:
         """
         Takes user input and streams response, langchain handles conversation history
         """
+        self._cancel_generation = False
         # Instantiates the llm to be used, setting the model and context window, other params can also be adjusted
         llm = ChatOllama(model="llama3.2:1b", num_ctx=5000)
         # Get context from all uploaded files selected
@@ -85,14 +87,26 @@ class Session:
         # Stream the model's response
         content_yielded = False
         for chunk in chain_with_message_history.stream({"input": input}):
+            if self._cancel_generation:
+                # Stop the generation
+                return
             content_yielded = True
             yield chunk.content
 
         # After the model finishes, yield the sources if available
         if formatted_sources is not None and content_yielded:
+            # One final check before yielding sources
+            if self._cancel_generation:
+                return
             yield formatted_sources
 
         self.num_exchanges += 1
+
+    def cancel_generation(self):
+        """Called to stop ongoing generation"""
+        self._cancel_generation = True
+        print("Generation cancellation requested")
+
 
     # Assigns a short summary to a session
     def assign_session_summary(self):

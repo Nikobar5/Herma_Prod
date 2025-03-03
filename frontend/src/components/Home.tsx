@@ -580,7 +580,7 @@ const handleSubmit = async (event: React.FormEvent) => {
                   {messages.map((msg, index) => (
                     msg.isUser ? (
                       <div key={index} className="message user-message">
-                        <div className="rich-text" dangerouslySetInnerHTML={{ __html: msg.text }} />
+                        <div className="rich-text">{msg.text}</div>
                       </div>
                     ) : (
                       <div key={index} className="bot-message-container">
