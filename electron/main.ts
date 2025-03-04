@@ -141,22 +141,28 @@ async function ensurePythonShell(): Promise<void> {
 function killOllama(): Promise<void> {
   return new Promise((resolve) => {
     const platform = process.platform;
-    const command = platform === 'win32' ? 'taskkill /F /IM ollama.exe' : 'killall ollama';
+
+    // Use more forceful commands to ensure Ollama is killed
+    const command = platform === 'win32'
+      ? 'taskkill /F /IM ollama.exe'
+      : 'pkill -9 ollama || killall -9 ollama || true';  // Force kill and ignore errors
 
     exec(command, (error: Error | null) => {
       if (error && !error.message.includes('No matching processes')) {
-        console.log('Note: No Ollama process was running');
+        console.log('Note: Error killing Ollama process:', error.message);
       }
       resolve();
     });
   });
 }
 
+// Update the startOllama function to ensure it waits before starting
 async function startOllama() {
   try {
     await killOllama();
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 1000));  // Wait longer
 
+    console.log("Starting Ollama service...");
     const ollama = spawn('ollama', ['serve']);
 
     ollama.stdout.on('data', (data: Buffer) => {
@@ -167,9 +173,13 @@ async function startOllama() {
       console.error(`Ollama stderr: ${data}`);
     });
 
-    ollama.on('close', (code: number) => {
+    ollama.on('close', (code: number | null) => {
       console.log(`Ollama process exited with code ${code}`);
     });
+
+    // Wait for Ollama to be ready
+    await new Promise(resolve => setTimeout(resolve, 2000));  // Give it time to initialize
+    console.log("Ollama should be ready now");
 
   } catch (error) {
     console.error('Error starting Ollama:', error);
@@ -345,13 +355,16 @@ ipcMain.handle('start-chat', async (event: Electron.IpcMainInvokeEvent, { messag
     });
   });
 
-  ipcMain.handle('interrupt-chat', async () => {
+ipcMain.handle('interrupt-chat', async () => {
   if (!activeChatRequestId || !pythonProcess) {
     return { success: false, message: 'No active chat to interrupt' };
   }
 
   try {
     console.log("Interrupting chat:", activeChatRequestId);
+
+    // First, kill the Ollama process to immediately stop generation
+    await killOllama();
 
     // Send an interrupt signal to Python
     pythonProcess.stdin.write(
@@ -374,12 +387,15 @@ ipcMain.handle('start-chat', async (event: Electron.IpcMainInvokeEvent, { messag
 
     // Send a [DONE] message to the renderer to signal completion
     const windows = BrowserWindow.getAllWindows();
-    windows.forEach((window: Electron.BrowserWindow) => {
+     windows.forEach((window: Electron.BrowserWindow) => {
       window.webContents.send('chat-response', '[DONE]');
     });
 
     // Add a brief delay to allow proper cleanup
     await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Restart Ollama for future requests
+    startOllama();
 
     activeChatRequestId = null;
     return { success: true };

@@ -194,14 +194,19 @@ class PythonServer:
             # Mark this request for interruption
             self.active_requests[target_request_id] = "interrupted"
 
-            # Actually stop the generation
+            # Stop the generation in the session
             self.session.cancel_generation()
 
+            # Immediately acknowledge the interrupt was processed
             print(json.dumps({
                 "requestId": request_id,
                 "success": True,
                 "done": True
             }), flush=True)
+
+            # Clean up the interrupted request
+            self.active_requests.pop(target_request_id, None)
+
         except Exception as e:
             print(json.dumps({
                 "requestId": request_id,

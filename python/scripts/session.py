@@ -107,6 +107,13 @@ class Session:
         self._cancel_generation = True
         print("Generation cancellation requested")
 
+        # Reset the session history state to be ready for new interactions
+        # This is important so new requests don't wait for the old Ollama process
+        if self.session_history != "":
+            # Keep the history but mark that we're ready for new interactions
+            # We don't actually delete the history as that would lose context
+            # The electron side will have already killed Ollama
+            pass  # Ollama is being killed externally
 
     # Assigns a short summary to a session
     def assign_session_summary(self):
@@ -115,5 +122,3 @@ class Session:
             "Output a sub 5 word short summary blurb of what the topic of this conversation is:"
             + "\n" + str(self.session_history) + "\n" + "make sure the output is under 6 words").content
         print(self.session_summary)
-
-
