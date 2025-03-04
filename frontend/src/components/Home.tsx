@@ -284,7 +284,7 @@ const handleInterrupt = async () => {
       ...prevMessages,
       {
         text: "Response cancelled",
-        htmlContent: marked("Response cancelled"),
+        htmlContent: marked("Response cancelled") as string,
         isUser: false
       }
     ]);
