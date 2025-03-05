@@ -286,12 +286,12 @@ body {
 .files-section {
   flex: 1;
   overflow-y: auto;
-  padding: 1rem;
+  padding: 0.5rem;
 }
 
 .files-section h3 {
   color: var(--text-color);
-  font-size: var(--h4-size);
+  font-size: calc(var(--h4-size) - calc(var(--base-size) / 1.6 / 1.6/1.6));
   font-family: Roboto, Arial;
   margin-bottom: 1rem;
 }
