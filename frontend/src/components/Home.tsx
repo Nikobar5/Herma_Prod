@@ -212,6 +212,9 @@ const messageHandler = (_event: any, chunk: string) => {
   }, []);
 
 const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (loading || isStreaming) {
+    return;
+  }
   const file = event.target.files?.[0];
   if (!file) return;
 
@@ -472,24 +475,26 @@ const handleSubmit = async (event: React.FormEvent) => {
           <div className="files-header">
             <h3>Uploaded Files</h3>
             {isUploading && <SidebarLoadingDots />}
-            <label className="upload-button"
-                      data-tooltip="Select files to upload">
-                      <input
-                        type="file"
-                        onChange={handleFileUpload}
-                        accept=".pdf,.txt,.md,.docx,.pptx,.xlsx,.csv,.json"
-                        style={{ display: "none" }}
-                      />
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
-                        width="20"
-                        height="20"
-                      >
-                        <path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10zM8 13.01l1.41 1.41L11 12.84V17h2v-4.16l1.59 1.59L16 13.01 12.01 9 8 13.01z"/>
-                      </svg>
-                    </label>
+            <label className={`upload-button ${(loading || isStreaming) ? 'disabled' : ''}`}
+                   data-tooltip={`${(loading || isStreaming) ? 'Please wait until response completes' : 'Select files to upload'}`}>
+              <input
+                type="file"
+                onChange={handleFileUpload}
+                accept=".pdf,.txt,.md,.docx,.pptx,.xlsx,.csv,.json"
+                style={{ display: "none" }}
+                disabled={loading || isStreaming}
+              />
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                width="20"
+                height="20"
+                className={loading || isStreaming ? "disabled-svg" : ""}
+              >
+                <path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10zM8 13.01l1.41 1.41L11 12.84V17h2v-4.16l1.59 1.59L16 13.01 12.01 9 8 13.01z"/>
+              </svg>
+            </label>
           </div>
             <ul className="files-list">
                {[...uploadedFiles].reverse().map((filename, index) => (
@@ -611,23 +616,26 @@ const handleSubmit = async (event: React.FormEvent) => {
       />
     </div>
     <div className="chat-buttons-container">
-      <label className="upload-button" data-tooltip="Select files to upload">
-        <input
-          type="file"
-          onChange={handleFileUpload}
-          accept=".pdf,.txt,.md,.docx,.pptx,.xlsx,.csv,.json"
-          style={{ display: "none" }}
-        />
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 24 24"
-          fill="currentColor"
-          width="20"
-          height="20"
-        >
-          <path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10zM8 13.01l1.41 1.41L11 12.84V17h2v-4.16l1.59 1.59L16 13.01 12.01 9 8 13.01z"/>
-        </svg>
-      </label>
+              <label className={`upload-button ${(loading || isStreaming) ? 'disabled' : ''}`}
+               data-tooltip={`${(loading || isStreaming) ? 'Please wait until response completes' : 'Select files to upload'}`}>
+          <input
+            type="file"
+            onChange={handleFileUpload}
+            accept=".pdf,.txt,.md,.docx,.pptx,.xlsx,.csv,.json"
+            style={{ display: "none" }}
+            disabled={loading || isStreaming}
+          />
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            width="20"
+            height="20"
+            className={loading || isStreaming ? "disabled-svg" : ""}
+          >
+            <path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10zM8 13.01l1.41 1.41L11 12.84V17h2v-4.16l1.59 1.59L16 13.01 12.01 9 8 13.01z"/>
+          </svg>
+        </label>
 
       {(loading || isStreaming) ? (
         <button
@@ -691,24 +699,26 @@ const handleSubmit = async (event: React.FormEvent) => {
                     style={{ height: 'auto' }}
                   />
               </div>
-              <label className="upload-button" data-tooltip="Select files to upload">
-                  <input
-                    type="file"
-                    onChange={handleFileUpload}
-                    accept=".pdf,.txt,.md,.docx,.pptx,.xlsx,.csv,.json"
-                    style={{ display: "none" }}
-                  />
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    width="20"
-                    height="20"
-                  >
-                    <path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10zM8 13.01l1.41 1.41L11 12.84V17h2v-4.16l1.59 1.59L16 13.01 12.01 9 8 13.01z"/>
-                  </svg>
-
-                  </label>
+                    <label className={`upload-button ${(loading || isStreaming) ? 'disabled' : ''}`}
+                           data-tooltip={`${(loading || isStreaming) ? 'Please wait until response completes' : 'Select files to upload'}`}>
+                      <input
+                        type="file"
+                        onChange={handleFileUpload}
+                        accept=".pdf,.txt,.md,.docx,.pptx,.xlsx,.csv,.json"
+                        style={{ display: "none" }}
+                        disabled={loading || isStreaming}
+                      />
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                        width="20"
+                        height="20"
+                        className={loading || isStreaming ? "disabled-svg" : ""}
+                      >
+                        <path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10zM8 13.01l1.41 1.41L11 12.84V17h2v-4.16l1.59 1.59L16 13.01 12.01 9 8 13.01z"/>
+                      </svg>
+                    </label>
                   {isStreaming ? (
                       <button
                         type="button"
