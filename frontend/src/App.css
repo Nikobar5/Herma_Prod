@@ -196,7 +196,7 @@ body {
   display: flex;
   height: 100vh;
   transform: width 0.3s ease;
-  min-width: 100px;
+  min-width: 60px;
   flex: 1;
 }
 
@@ -230,7 +230,7 @@ body {
 }
 
 .sidebar-container.closed {
-  width: 60px;
+  max-width: 5px;
 }
 .sidebar-toggle,
 .new-chat-button {
@@ -404,6 +404,7 @@ body {
   .center {
     margin-left: 0;
     width: 100%;
+    overflow-wrap: break-word;
   }
 
   .sidebar-controls {
@@ -426,8 +427,26 @@ body {
     --message-max-width: 85%;
   }
 
+  body {
+    overflow-x: auto;
+  }
+
   .input-container {
     max-width: calc(100% - 80px);
+    min-width: 10px;
+    flex: 0;
+  }
+
+  .centered-start {
+    max-width: calc(100% - 80px);
+    min-width: 10px;
+    flex: 0;
+  }
+
+  .chat-form-centered {
+    max-width: calc(100% - 80px);
+    min-width: 10px;
+    flex: 0;
   }
 
   .sidebar-closed + .sidebar-controls {
