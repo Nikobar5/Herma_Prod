@@ -26,7 +26,7 @@
   --h5-size: calc(var(--base-size) / var(--ratio));
   --h6-size: calc(var(--small-size) / var(--ratio));
 
-  --font: 'Times New Roman', Times, serif, sans-serif;
+  --font: 'Roboto', Arial, serif, sans-serif;
   --font-size: 16px;
 
   /* Spacing System */
@@ -74,6 +74,7 @@ body {
 /************* Tooltips ****************/
 [data-tooltip] {
   position: relative;
+  z-index: 2000;
 }
 
 [data-tooltip]:before,
@@ -83,7 +84,7 @@ body {
   pointer-events: none;
   transition: all 0.5s ease;
   position: absolute;
-  z-index: 1000;
+  z-index: 1800;
 }
 
 [data-tooltip]:before {
@@ -94,7 +95,7 @@ body {
   color: white;
   font-size: 12px;
   white-space: nowrap;
-  top: calc(100% + 10px); /* Position below the button */
+  top: calc(100% + 10px);
   left: 50%;
   transform: translateX(-50%);
 }
@@ -102,7 +103,7 @@ body {
 [data-tooltip]:after {
   content: "";
   position: absolute;
-  top: calc(100% + 5px); /* Position the arrow just below the button */
+  top: calc(100% + 5px);
   left: 50%;
   transform: translateX(-50%);
   border-style: solid;
@@ -114,6 +115,20 @@ body {
 [data-tooltip]:hover:after {
   visibility: visible;
   opacity: 1;
+}
+
+.sidebar-container.closed .sidebar-controls [data-tooltip]:before {
+  top: 50%;
+  left: calc(100% + 10px);
+  transform: translateY(-50%);
+}
+
+.sidebar-container.closed .sidebar-controls [data-tooltip]::after {
+  top: 50%;
+  left: calc(100% + 5px);
+  transform: translateY(-50%);
+  border-width: 5px 5px 5px 0;
+  border-color: transparent var(--highlight-color) transparent transparent;
 }
 /************* Tooltips ****************/
 
@@ -177,11 +192,12 @@ body {
 /************* Sidebar ****************/
 .sidebar-container {
   position: relative;
-  width: var(--sidebar-width);
+  max-width: var(--sidebar-width);
   display: flex;
   height: 100vh;
   transform: width 0.3s ease;
-  min-width: 60px;
+  min-width: 100px;
+  flex: 1;
 }
 
 .sidebar {
@@ -228,6 +244,7 @@ body {
   align-items: center;
   justify-content: center;
   transition: background-color 0.2s ease;
+  flex: 4;
   z-index: 1600;
 
   width: 36px;
@@ -257,6 +274,7 @@ body {
 .logo-container > h2 {
   font-size: var(--h3-size);
   color: var(--text-color);
+  font-family: 'Times New Roman', Times, serif;
 }
 
 .files-section {
@@ -344,7 +362,7 @@ body {
 }
 
 /* Responsive Design */
-@media (max-width: 1200px) {
+@media (max-width: 1000px) {
   .root {
     --chat-min-width: 80%;
   }
@@ -362,6 +380,11 @@ body {
 
   .sidebar-container:not(.closed) .sidebar {
     transform: translateX(0);
+  }
+
+  .sidebar-container:not(.closed) .sidebar-controls {
+    position: absolute;
+    left: 200px;
   }
 
   /*.sidebar-container.open .sidebar {
@@ -384,18 +407,16 @@ body {
   }
 
   .sidebar-controls {
-    flex-direction: column; /* Force row direction */
-    right: 10px;
     left: auto;
-    position: fixed;
+    right: 1rem;
+    position: absolute;
     top: 2rem;
-    /*transform: translateX(275%);*/
+    flex-direction: row;
     z-index: 1700;
   }
 
   .sidebar-closed + .sidebar-controls {
     flex-direction: column;
-    transform: translateX(-5%);
   }
 }
 
@@ -451,6 +472,7 @@ body {
 .center-title {
   font-size: var(--h1-size);
   cursor: text;
+  font-family: 'Times New Roman', Times, serif;
 }
 
 .loading {
