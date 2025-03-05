@@ -8,12 +8,18 @@
 
 :root{
   /* Color Pallet */
-  --primary-bg: #A9B5DF;
-  --secondary-bg: #7886C7;
-  --selected-color: #FFF2F2;
+  /*OG colors -- primary:A9B5DF secondary:7886C7 selected:FFF2F2 highlight:2D336B*/
+  --primary-bg: #E8E8E4;
+  --secondary-bg: #9CA9D6;
+  --selected-color: #E8E8E4;
   --highlight-color: #2D336B;
+  /*--primary-bg: #8494C8;
+  --secondary-bg: #5A6BB1;
+  --selected-color: #F5F7FF;
+  --highlight-color: #2D3D78;*/
   --border-color: rgba(255, 255, 255, 0.1);
   --text-color: black;
+  --text-colorw: white;
   --button-hover: white;
 
   /* Golden Ratio Text Sizes */
@@ -303,8 +309,9 @@ body {
   cursor: pointer;
   position: relative;
   transition: all 0.2s ease;
-  background-color: var(--primary-bg);
+  background-color: var(--highlight-color);
   overflow: hidden;
+  color: var(--text-colorw);
 }
 
 .file-item:hover {
