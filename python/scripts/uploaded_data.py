@@ -60,8 +60,8 @@ class Uploaded_data:
         elif data_path.lower().endswith(".pdf"):
             # document_loader = PyPDFLoader(data_path)
             return self._process_pdf(data_path)
-        elif data_path.lower().endswith((".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff")):
-            return self._process_image(data_path)
+        # elif data_path.lower().endswith((".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff")):
+        #     return self._process_image(data_path)
         elif data_path.lower().endswith((".txt", ".md")):
             return self._process_text(data_path)
         elif data_path.lower().endswith(".docx"):

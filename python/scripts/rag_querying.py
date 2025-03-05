@@ -20,7 +20,7 @@ def query_rag(query_text: str, vector_database_directory):
     print(f"Execution time for retrieving database is: {end_time - start_time:.6f} seconds")
     # Search the DB.
     start_time = time.time()
-    results = db.similarity_search_with_score(query_text, k=4)
+    results = db.similarity_search_with_score(query_text, k=3)
     end_time = time.time()
     print(f"Execution time for rag search is: {end_time - start_time:.6f} seconds")
     context_text = "\n\n---\n\n".join([doc.page_content for doc, _score in results])

@@ -11,12 +11,12 @@
   /*OG colors -- primary:A9B5DF secondary:7886C7 selected:FFF2F2 highlight:2D336B*/
   --primary-bg: #E8E8E4;
   --secondary-bg: #9CA9D6;
-  --selected-color: #E8E8E4;
+  /*--selected-color: #E8E8E4;
   --highlight-color: #2D336B;
-  /*--primary-bg: #8494C8;
-  --secondary-bg: #5A6BB1;
+  --primary-bg: #8494C8;
+  --secondary-bg: #5A6BB1;*/
   --selected-color: #F5F7FF;
-  --highlight-color: #2D3D78;*/
+  --highlight-color: #2D3D78;
   --border-color: rgba(255, 255, 255, 0.1);
   --text-color: black;
   --text-colorw: white;

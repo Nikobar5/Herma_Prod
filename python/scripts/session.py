@@ -3,6 +3,7 @@ from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_core.runnables.history import RunnableWithMessageHistory
 
 from prompt_maker import make_prompt
+from langchain.globals import set_debug
 import logging
 from uploaded_data import Uploaded_data
 
@@ -16,6 +17,7 @@ from rag_querying import query_rag
 # also makes it easier to manage all storage in one centralized area instead of within the class
 class Session:
     def __init__(self, currently_used_data):
+        set_debug(True)
         self.session_summary = ""
         self.session_history = ""
         self.num_exchanges = 0
@@ -44,6 +46,8 @@ class Session:
             context = ""
             source_filenames = []
             for data in self.currently_used_data:
+                # Adds metacontext about what the names of the docs are and which context is from which doc
+                context += "Here is the context from the document named " + data.name
                 context_text, sources = query_rag(input, data.vector_database_path)
                 context += context_text + "\n\n"
 
@@ -75,7 +79,7 @@ class Session:
             formatted_sources = markdown_table
             llm.get_num_tokens(context)
 
-        prompt = make_prompt(input, context)
+        prompt = make_prompt(input, context, self.currently_used_data)
         chain = prompt | llm
         chain_with_message_history = RunnableWithMessageHistory(
             chain,
