@@ -42,6 +42,8 @@ const Home: React.FC = () => {
   const messageDisplayRef = useRef<HTMLDivElement | null>(null);
   const messageEndRef = useRef<HTMLDivElement | null>(null);
   const isNearBottomRef = useRef(true);
+  const [charCount, setCharCount] = useState(0);
+  const MAX_CHARS = 3000;
 
   const scrollToBottom = () => {
     if (messageEndRef.current && autoScroll) {
@@ -132,17 +134,71 @@ const Home: React.FC = () => {
       };
     }, [loading]);
 
-  const handleChatInput = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const textarea = event.target;
-    setChatMessage(event.target.value);
+    const handleChatInput = async (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+  const textarea = event.target;
+  const newText = event.target.value;
 
-    // Reset height to auto to get the correct scrollHeight
-    textarea.style.height = 'auto';
-    // Calculate new height while respecting min/max constraints
-    const newHeight = Math.min(Math.max(textarea.scrollHeight, 24), 208); // 24px min, 208px max
-    // Set the height to match the content
-    textarea.style.height = `${newHeight}px`;
-  };
+  // Check if this is likely a paste operation (sudden large text increase)
+  const isProbablyPaste = chatMessage.length + 10 < newText.length && newText.length > MAX_CHARS;
+
+  // If the text is within the character limit or not a paste, update normally
+  if (newText.length <= MAX_CHARS && !isProbablyPaste) {
+    setChatMessage(newText);
+  } else if (isProbablyPaste) {
+    // If it's a paste operation and exceeds limit, put the entire content in a file
+    try {
+      setIsUploading(true);
+
+      // Create a Blob from the entire pasted text
+      const blob = new Blob([newText], { type: 'text/plain' });
+
+      // Generate a unique filename with timestamp
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const filename = `paste_${timestamp}.txt`;
+
+      // Convert Blob to Buffer for Electron
+      const arrayBuffer = await blob.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      // Upload the file using the existing ipcRenderer method
+      await ipcRenderer.invoke('upload-file', {
+        filename,
+        data: buffer
+      });
+
+      // Add to the list of uploaded files
+      setUploadedFiles(prev => [...prev, filename]);
+      setSelectedFiles(prev => [...prev, filename]);
+
+      // Select the file
+      await ipcRenderer.invoke('select-files', {
+        filenames: [...selectedFiles, filename]
+      });
+
+      // Update the files list
+      const files = await ipcRenderer.invoke('get-files');
+      setUploadedFiles(files);
+
+      // Keep the chat input as it was before the paste
+      // Don't update the chatMessage state, so it remains unchanged
+
+    } catch (error) {
+      console.error("Error handling paste:", error);
+    } finally {
+      setIsUploading(false);
+    }
+  } else {
+    // For normal typing that exceeds the limit, just truncate
+    setChatMessage(newText.substring(0, MAX_CHARS));
+  }
+
+  // Reset height to auto to get the correct scrollHeight
+  textarea.style.height = 'auto';
+  // Calculate new height while respecting min/max constraints
+  const newHeight = Math.min(Math.max(textarea.scrollHeight, 24), 208); // 24px min, 208px max
+  // Set the height to match the content
+  textarea.style.height = `${newHeight}px`;
+};
 
   const handleSidebarToggle = () => {
     // Toggle the sidebar state
@@ -204,6 +260,7 @@ const messageHandler = (_event: any, chunk: string) => {
   });
   setAutoScroll(wasNearBottom);
 };
+
 
     ipcRenderer.on('chat-response', messageHandler);
     return () => {
@@ -280,6 +337,7 @@ const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     event.target.value = ''; // Clear the file input
   }
 };
+
 const handleInterrupt = async () => {
   // If we haven't started streaming yet, add a cancelled message
   if (loading && !isStreaming) {

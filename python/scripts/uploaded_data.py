@@ -99,17 +99,56 @@ class Uploaded_data:
         return documents
 
     def _extract_tables_from_pdf(self, page):
-        table_text = []
+        """
+        Extract tables from PDF page and format them as Markdown tables.
+        """
+        markdown_tables = []
         raw_text = page.get_text("text")
 
-        if raw_text:
-            rows = raw_text.split("\n")
-            for row in rows:
-                if "\t" in row or " " in row:  # Table structure detection
-                    table_text.append(row.replace(" ", "\t"))
-            return "\n".join(table_text)
+        if not raw_text:
+            return ""
 
-        return ""
+        # Split the text into potential table sections
+        # We're looking for consecutive lines that might form a table
+        rows = raw_text.split("\n")
+
+        # Process potential tables
+        table_rows = []
+        in_table = False
+
+        for row in rows:
+            # Simple heuristic to detect table rows (contains tabs or multiple spaces)
+            if "\t" in row or "  " in row:  # Using double space as a more conservative delimiter
+                # This might be a table row
+                if not in_table:
+                    in_table = True
+                    table_rows = []
+
+                # Split the row into cells using tabs or multiple spaces
+                cells = []
+                if "\t" in row:
+                    cells = row.split("\t")
+                else:
+                    # Split by multiple spaces, but preserve single spaces within cells
+                    import re
+                    cells = re.split(r'  +', row)
+
+                # Clean up cells (strip extra spaces)
+                cells = [cell.strip() for cell in cells]
+                table_rows.append(cells)
+            else:
+                # If we were in a table and now found non-table text, convert the table we've collected
+                if in_table and table_rows:
+                    markdown_table = self._convert_to_markdown_table(table_rows)
+                    markdown_tables.append(markdown_table)
+                    in_table = False
+
+        # Handle case where table goes to the end of the page
+        if in_table and table_rows:
+            markdown_table = self._convert_to_markdown_table(table_rows)
+            markdown_tables.append(markdown_table)
+
+        return "\n\n".join(markdown_tables)
 
     def _extract_images_from_pdf(self, page):
         extracted_texts = []
@@ -129,6 +168,47 @@ class Uploaded_data:
 
         return extracted_texts
 
+    def _convert_to_markdown_table(self, table_rows):
+        """
+        Convert a list of cell rows into a Markdown table.
+
+        Args:
+            table_rows: List of lists, where each inner list contains cells for a row
+
+        Returns:
+            String containing a properly formatted Markdown table
+        """
+        if not table_rows or len(table_rows) == 0:
+            return ""
+
+        # Determine the max number of columns
+        max_cols = max(len(row) for row in table_rows)
+
+        # Make sure all rows have the same number of columns
+        normalized_rows = []
+        for row in table_rows:
+            if len(row) < max_cols:
+                # Pad with empty cells
+                normalized_rows.append(row + [''] * (max_cols - len(row)))
+            else:
+                normalized_rows.append(row)
+
+        # Create the markdown table
+        markdown_lines = []
+
+        # First row becomes the header
+        header = normalized_rows[0]
+        markdown_lines.append('| ' + ' | '.join(header) + ' |')
+
+        # Add the separator row
+        markdown_lines.append('| ' + ' | '.join(['---'] * len(header)) + ' |')
+
+        # Add the data rows
+        for row in normalized_rows[1:]:
+            markdown_lines.append('| ' + ' | '.join(row) + ' |')
+
+        return '\n'.join(markdown_lines)
+
     ##### NEED TO AUTOMATE TESSERACT INSTALATION BEFORE IT CAN RUN #####
     # def _process_image(self, image_path):
     #     try:
@@ -140,7 +220,7 @@ class Uploaded_data:
 
     def split_documents(self):
         text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1500,
+            chunk_size=1000,
             chunk_overlap=40,
             length_function=len,
             is_separator_regex=False,

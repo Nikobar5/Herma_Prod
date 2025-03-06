@@ -38,7 +38,7 @@ class Session:
         """
         self._cancel_generation = False
         # Instantiates the llm to be used, setting the model and context window, other params can also be adjusted
-        llm = ChatOllama(model="llama3.2:1b", num_ctx=10000)
+        llm = ChatOllama(model="llama3.2:1b", num_ctx=100000)
         # Get context from all uploaded files selected
         context = None
         formatted_sources = None
