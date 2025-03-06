@@ -309,23 +309,23 @@ body {
   cursor: pointer;
   position: relative;
   transition: all 0.2s ease;
-  background-color: var(--highlight-color);
+  background-color: rgba(255, 255, 255, 0.35);
   overflow: hidden;
-  color: var(--text-colorw);
+  color: var(--text-color);
 }
 
 .file-item:hover {
-  background-color: rgba(255, 255, 255, 0.2);
+  background-color:  rgba(255, 255, 255, 0.4);
 }
 
 .file-selected {
   color: var(--text-color);
-  background-color: var(--selected-color);
+  background-color: var(--primary-bg);
   border-radius: 20px;
 }
 
 .file-selected:hover {
-  background-color: rgba(255, 255, 255, 0.25);
+  background-color: rgba(255, 255, 255, 0.679);
 }
 
 .files-header {
