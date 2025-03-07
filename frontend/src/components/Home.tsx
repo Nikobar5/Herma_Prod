@@ -134,7 +134,7 @@ const Home: React.FC = () => {
       };
     }, [loading]);
 
-    const handleChatInput = async (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+const handleChatInput = async (event: React.ChangeEvent<HTMLTextAreaElement>) => {
   const textarea = event.target;
   const newText = event.target.value;
 
@@ -145,14 +145,17 @@ const Home: React.FC = () => {
   if (newText.length <= MAX_CHARS && !isProbablyPaste) {
     setChatMessage(newText);
   } else if (isProbablyPaste) {
-    // If it's a paste operation and exceeds limit, put the entire content in a file
+    // If it's a paste operation and exceeds limit, extract only the pasted content
+    // Calculate what was pasted by finding the difference between new and old text
+    const pastedContent = newText.substring(chatMessage.length);
+
     try {
       setIsUploading(true);
 
-      // Create a Blob from the entire pasted text
-      const blob = new Blob([newText], { type: 'text/plain' });
+      // Create a Blob from just the pasted content
+      const blob = new Blob([pastedContent], { type: 'text/plain' });
 
-      // Generate a unique filename with timestamp
+      // Generate a unique filename with timestamp and random string
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const filename = `paste_${timestamp}.txt`;
 
@@ -180,8 +183,7 @@ const Home: React.FC = () => {
       setUploadedFiles(files);
 
       // Keep the chat input as it was before the paste
-      // Don't update the chatMessage state, so it remains unchanged
-
+      // This effectively ignores the paste operation
     } catch (error) {
       console.error("Error handling paste:", error);
     } finally {
@@ -435,7 +437,10 @@ const handleSubmit = async (event: React.FormEvent) => {
 
   try {
     console.log("Attempting to send message:", currentMessage);
-    await ipcRenderer.invoke('start-chat', { message: currentMessage });
+    const escapedMessage = currentMessage
+  .split('{').join('{{')  // Replace each { with {{
+  .split('}').join('}}'); // Replace each } with }}
+    await ipcRenderer.invoke('start-chat', { message: escapedMessage });
   } catch (error) {
     console.error("Error sending message:", error);
     setMessages(prevMessages => [
