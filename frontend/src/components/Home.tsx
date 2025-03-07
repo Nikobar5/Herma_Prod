@@ -437,15 +437,18 @@ const handleSubmit = async (event: React.FormEvent) => {
 
   try {
     console.log("Attempting to send message:", currentMessage);
-    const escapedMessage = currentMessage
-  .split('{').join('{{')  // Replace each { with {{
-  .split('}').join('}}'); // Replace each } with }}
-    await ipcRenderer.invoke('start-chat', { message: escapedMessage });
+
+    // Add a special prefix that Python backend can detect
+    // Use Base64 encoding to completely avoid formatting issues
+    const encodedMessage = "_BASE64_" + btoa(unescape(encodeURIComponent(currentMessage)));
+
+    console.log("Sending encoded message");
+    await ipcRenderer.invoke('start-chat', { message: encodedMessage });
   } catch (error) {
     console.error("Error sending message:", error);
     setMessages(prevMessages => [
       ...prevMessages,
-      { text: marked("❌ Error: Failed to send message") as string, isUser: false }
+      { text: "❌ Error: Failed to send message", htmlContent: marked("❌ Error: Failed to send message"), isUser: false }
     ]);
   } finally {
     // Note: Don't reset loading here, it will be handled by the messageHandler

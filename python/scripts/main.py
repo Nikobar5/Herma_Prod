@@ -74,6 +74,20 @@ class PythonServer:
             # Track this request
             self.active_requests[request_id] = "active"
 
+            # Check if message is Base64 encoded with our special prefix
+            if message.startswith("_BASE64_"):
+                # Remove the prefix and decode
+                import base64
+                encoded_part = message[len("_BASE64_"):]
+                try:
+                    # Decode Base64 to bytes, then decode bytes to string
+                    message = base64.b64decode(encoded_part).decode('utf-8')
+                    print(f"Successfully decoded Base64 message")
+                except Exception as e:
+                    print(f"Error decoding message: {e}")
+                    # If decoding fails, use the original message
+                    # This is a fallback in case something goes wrong with decoding
+
             # Start the generator for chat response
             response_generator = self.session.ask(message)
 

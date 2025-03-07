@@ -8,6 +8,7 @@ from uploaded_data import Uploaded_data
 # Queries the RAG with a given input
 def query_rag(query_text: str, vector_database_directory):
     # Prepare the DB.
+    safe_query_text = query_text.replace('{', '{{').replace('}', '}}')
     start_time = time.time()
     embedding_function = get_embedding_function()
     end_time = time.time()
@@ -20,13 +21,13 @@ def query_rag(query_text: str, vector_database_directory):
     print(f"Execution time for retrieving database is: {end_time - start_time:.6f} seconds")
     # Search the DB.
     start_time = time.time()
-    results = db.similarity_search_with_score(query_text, k=3)
+    results = db.similarity_search_with_score(safe_query_text, k=3)
     end_time = time.time()
     print(f"Execution time for rag search is: {end_time - start_time:.6f} seconds")
     context_text = "\n\n---\n\n".join([doc.page_content for doc, _score in results])
     # Get sources of RAG query
     # sources = [doc.metadata.get("id", None) for doc, _score in results]
     sources = [doc.metadata.get("id", "").split("/")[-1] for doc, _score in results]
-    formatted_sources = "\n".join(sources)
+    formatted_sources = "\n".join(sources).replace('{', '{{').replace('}', '}}')
     sources_text = f"\n{formatted_sources}"
     return context_text, sources_text

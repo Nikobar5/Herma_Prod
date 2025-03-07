@@ -10,13 +10,17 @@ from uploaded_data import Uploaded_data
 
 def make_prompt(input, context, currently_used_data):
     if context:
+        # Escape curly braces in context before using it in an f-string
+        safe_context = context.replace('{', '{{').replace('}', '}}')
 
         num_docs = len(currently_used_data)
         doc_names = [doc.name for doc in currently_used_data]
-        doc_names_str = ", ".join(doc_names)
+        # Escape any potential curly braces in doc names
+        safe_doc_names = [name.replace('{', '{{').replace('}', '}}') for name in doc_names]
+        doc_names_str = ", ".join(safe_doc_names)
 
         context_addition = f"You are currently given {num_docs} documents to search in and utilize. " \
-                           f"Their names are: {doc_names_str}. \nHere is the provided context: {context}"
+                           f"Their names are: {doc_names_str}. \nHere is the provided context: {safe_context}"
         prompt = ChatPromptTemplate.from_messages([
             (
                 "system",
@@ -35,7 +39,5 @@ def make_prompt(input, context, currently_used_data):
             MessagesPlaceholder(variable_name="chat_history"),
             ("human", "{input}"),
         ])
-
-
 
     return prompt
