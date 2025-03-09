@@ -45,33 +45,52 @@ class Session:
         if self.currently_used_data != []:
             context = ""
             source_filenames = []
+
+            # Collect results from all databases
+            all_results = []
             for data in self.currently_used_data:
-                # Adds metacontext about what the names of the docs are and which context is from which doc
-                context += "Here is the context from the document named " + data.name
-                context_text, sources = query_rag(input, data.vector_database_path)
-                context += context_text + "\n\n"
+                # Query the vector database and collect results with their scores
+                results = query_rag(input, data.vector_database_path)
 
-                # Parse source filenames and add to our collection
-                # Each source will be in format "filename\nfilename\n..."
-                if sources and sources.strip():
-                    source_lines = sources.strip().split('\n')
-                    for line in source_lines:
-                        if line.strip():  # Skip empty lines
-                            # Parse page and section if available (format might be "filename Page: X:Y")
-                            file_parts = line.split(" Page: ")
-                            filename = file_parts[0]
+                # Add document name to metadata for each result
+                for doc, score in results:
+                    doc.metadata["document_name"] = data.name
+                    all_results.append((doc, score))
 
-                            # Extract page and section if available
-                            page = "-"
-                            section = "-"
-                            if len(file_parts) > 1 and ":" in file_parts[1]:
-                                page_section = file_parts[1].split(":")
-                                page = page_section[0]
-                                section = page_section[1] if len(page_section) > 1 else "-"
+            # Sort all results by score (lower is better in similarity search)
+            all_results.sort(key=lambda x: x[1])
 
-                            source_filenames.append((filename, page, section))
+            # Take the top 5 results overall
+            top_results = all_results[:5]
 
-            # Create markdown table
+            # Create context text from top results
+            if top_results:
+                context_pieces = []
+                for doc, score in top_results:
+                    # Add doc name prefix to each chunk
+                    doc_name = doc.metadata.get("document_name", "Unknown")
+                    context_piece = f"From document '{doc_name}':\n{doc.page_content}"
+                    context_pieces.append(context_piece)
+
+                    # Add to source filenames for citation
+                    source = doc.metadata.get("id", "").split("/")[-1]
+                    file_parts = source.split(" Page: ")
+                    filename = file_parts[0]
+
+                    # Extract page and section if available
+                    page = "-"
+                    section = "-"
+                    if len(file_parts) > 1 and ":" in file_parts[1]:
+                        page_section = file_parts[1].split(":")
+                        page = page_section[0]
+                        section = page_section[1] if len(page_section) > 1 else "-"
+
+                    source_filenames.append((filename, page, section))
+
+                # Join all context pieces
+                context = "\n\n---\n\n".join(context_pieces)
+
+            # Create markdown table of sources
             markdown_table = "\n\n**Sources**\n\n| Filename | Page | Section |\n| -------- | ---- | ------- |\n"
             for filename, page, section in source_filenames:
                 markdown_table += f"| {filename} | {page} | {section} |\n"
