@@ -49,6 +49,9 @@ class Uploaded_data:
         print(f"Execution time for load documents is: {end_time - start_time:.6f} seconds")
         self.data_summary = ""
         self.add_to_chroma()
+        print(f"Generating summary for {name}...")
+        self.data_summary = self.generate_summary()
+        print(f"Summary generated for {name}")
 
     #   Accepted file types .pdf, .txt, .md, .docx, .pptx, .xlsx, .csv, .json
     def load_documents(self, data_path):
@@ -336,6 +339,43 @@ class Uploaded_data:
             chunk.metadata["id"] = chunk_id
 
         return chunks
+
+    def generate_summary(self):
+        """Generate a summary of the document using the first and last two chunks"""
+        from langchain_ollama import ChatOllama
+
+        # Get the first and last two chunks
+        chunks = self.split_documents()
+        if not chunks:
+            return "No content available for summarization."
+
+        # If we have fewer than 4 chunks, use all available chunks
+        sample_chunks = []
+        if len(chunks) >= 4:
+            sample_chunks = chunks[:2] + chunks[-2:]
+        else:
+            sample_chunks = chunks
+
+        # Extract text from chunks
+        sample_text = "\n\n---\n\n".join([chunk.page_content for chunk in sample_chunks])
+
+        # Create a summarization prompt
+        summary_prompt = f"""
+        Below is text from the first and last parts of a document titled '{self.name}'. 
+
+        Please provide a TWO-SENTENCE summary of what this document is about.
+        Include any information about: title, author, publishing date, main topic, key implications. 
+        Format your response as a paragraph without bullet points.
+
+        DOCUMENT TEXT:
+        {sample_text}
+        """
+
+        # Initialize LLM and generate summary
+        llm = ChatOllama(model="llama3.2:1b")
+        result = llm.invoke(summary_prompt)
+
+        return result.content
 
     @staticmethod
     def get_project_root():
