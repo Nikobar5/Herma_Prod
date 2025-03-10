@@ -34,24 +34,33 @@ from PIL import Image  # for images
 # each uploaded data stores a summary of itself and the path to the
 # vector database that represents it in semantic form for retrieval. The embedding function can encode and
 # decode this so there is no need to store the raw text
+
+
 class Uploaded_data:
-    def __init__(self, name, data_path):
+    def __init__(self, name, data_path, non_chat_history):
+        self.non_chat_history = non_chat_history
         self.name = name
+
         self.data_path = data_path
+        start_time = time.time()
+        self.documents = self.load_documents(self.data_path)
+        end_time = time.time()
+        print(f"Execution time for load documents is: {end_time - start_time:.6f} seconds")
+
 
         # Create a unique database path with timestamp
         self.timestamp = int(time.time() * 1000)  # millisecond precision
         self.vector_database_path = f"{name}_{self.timestamp}"
 
-        start_time = time.time()
-        self.documents = self.load_documents(data_path)
-        end_time = time.time()
-        print(f"Execution time for load documents is: {end_time - start_time:.6f} seconds")
-        self.data_summary = ""
         self.add_to_chroma()
-        print(f"Generating summary for {name}...")
-        self.data_summary = self.generate_summary()
-        print(f"Summary generated for {name}")
+
+        if non_chat_history:
+            print(f"Generating summary for {name}...")
+            self.data_summary = self.generate_summary()
+            print(f"Summary generated for {name}")
+
+
+
 
     #   Accepted file types .pdf, .txt, .md, .docx, .pptx, .xlsx, .csv, .json
     def load_documents(self, data_path):
@@ -223,8 +232,8 @@ class Uploaded_data:
 
     def split_documents(self):
         text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000,
-            chunk_overlap=40,
+            chunk_size=500,
+            chunk_overlap=50,
             length_function=len,
             is_separator_regex=False,
         )

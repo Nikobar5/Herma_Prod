@@ -30,14 +30,14 @@ def make_prompt(input, context, currently_used_data):
         safe_doc_names = [name.replace('{', '{{').replace('}', '}}') for name in doc_names]
         doc_names_str = ", ".join(safe_doc_names)
 
-        context_addition = f"""You are currently given {num_docs} documents to search in and utilize. 
-Their names are: {doc_names_str}.
-
-Document Summaries:
-{doc_summaries_str}
-
-Here is the provided context extracted from these documents:
-{safe_context}"""
+        context_addition = f"""You are currently given context from {num_docs} documents to utilize. 
+        Their names are: {doc_names_str}.
+        
+        Document Summaries:
+        {doc_summaries_str}
+        
+        Here is the provided context extracted from these documents:
+        {safe_context}"""
 
         prompt = ChatPromptTemplate.from_messages([
             (
@@ -52,7 +52,7 @@ Here is the provided context extracted from these documents:
         prompt = ChatPromptTemplate.from_messages([
             (
                 "system",
-                "You are a helpful AI assistant. Answer all questions to the best of your ability.",
+                "You are a helpful AI assistant named Herma. Answer all questions to the best of your ability.",
             ),
             MessagesPlaceholder(variable_name="chat_history"),
             ("human", "{input}"),
