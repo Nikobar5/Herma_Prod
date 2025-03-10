@@ -7,6 +7,7 @@ from langchain.globals import set_debug
 import logging
 from uploaded_data import Uploaded_data
 from rag_querying import query_rag
+import glob
 from count_tokens import estimate_tokens
 
 # Session class represents a chat session, session_id can be used for ordering/organizing chat history,
@@ -165,9 +166,8 @@ class Session:
         """
         Trims the chat history if it exceeds 8000 characters.
         Keeps the most recent messages and trims from the beginning,
-        making sure to cut at the start of a user message for context coherence.
-        Stores the clipped history in a text file within the chat_history_storage folder
-        and creates an Uploaded_data object with the path to this file.
+        working backwards until the 8000 character limit is reached,
+        then finding the next human message to create a clean cut.
         """
         import os
         from pathlib import Path
@@ -182,57 +182,67 @@ class Session:
 
         # Convert to string to check total length
         history_string = self.get_history_as_string()
+        total_length = len(history_string)
+
+        # Debug print to verify the actual length
+        print(f"DEBUG: Current history length: {total_length} characters")
 
         # If under the limit, no need to trim
-        if len(history_string) <= 8000:
+        if total_length <= 8000:
+            print(f"DEBUG: History under 8000 char limit, no trimming needed.")
             return
 
-        # We need to trim
-        # Start from most recent and work backwards to find the 8000 character mark
-        remaining_chars = 8000
+        # Start from the most recent message and work backwards
+        # to find which messages to keep under the 8000 character limit
         messages_to_keep = []
-        messages_to_clip = []
+        current_length = 0
 
-        # Process messages from newest to oldest (reversed)
-        for i, message in enumerate(reversed(messages)):
-            message_text = f"{'User: ' if message.type == 'human' else 'Assistant: '}{message.content}\n"
+        # Process messages from newest (end) to oldest (beginning)
+        for message in reversed(messages):
+            # Calculate the length of this message (with prefix)
+            prefix = "User: " if message.type == "human" else "Assistant: "
+            message_text = f"{prefix}{message.content}\n"
             message_length = len(message_text)
 
-            # If this message fits in our remaining character budget
-            if message_length <= remaining_chars:
-                messages_to_keep.insert(0, message)  # Insert at beginning to restore original order
-                remaining_chars -= message_length
-            else:
-                # We've hit our limit, but we want to find the next user message for a clean cut
-                # If this is already a user message, we'll break after adding it to messages_to_clip
-                if message.type == "human":
-                    messages_to_clip = list(messages[:len(messages) - i])
-                    break
-
-                # If it's an assistant message, we need to include the previous user message too
-                # for context, but only if we have more messages to check
-                if i < len(messages) - 1:
-                    # Find the index in the original list
-                    clip_index = len(messages) - i - 1
-                    # This will ensure we clip at a user message boundary
-                    for j in range(clip_index, -1, -1):
-                        if j > 0 and messages[j].type == "human" and messages[j - 1].type == "assistant":
-                            messages_to_clip = list(messages[:j])
-                            break
-                        elif j == 0:
-                            messages_to_clip = list(messages[:1])
-                    break
-
-                # If we only have this message, we need to keep it even if it's over the limit
-                messages_to_keep.insert(0, message)
+            # If adding this message would exceed the limit, stop here
+            if current_length + message_length > 8000:
                 break
 
-        # If for some reason we didn't determine which messages to clip,
-        # default to clipping all messages not in messages_to_keep
-        if not messages_to_clip and len(messages_to_keep) < len(messages):
-            messages_to_clip = list(messages[:len(messages) - len(messages_to_keep)])
+            # This message fits, so keep it
+            messages_to_keep.insert(0, message)  # Insert at beginning to restore original order
+            current_length += message_length
 
-        # Extract the clipped messages into a string for storing in ltm_session_history
+        # If we're keeping all messages, no need to trim
+        if len(messages_to_keep) == len(messages):
+            print(f"DEBUG: Calculated to keep all messages, something unexpected happened.")
+            return
+
+        # Find the index where we should make the cut
+        cutoff_index = 0
+        if messages_to_keep:
+            # Find the index of the first message we want to keep
+            first_keep_message = messages_to_keep[0]
+            for i, msg in enumerate(messages):
+                if msg is first_keep_message:
+                    cutoff_index = i
+                    break
+
+        # Make sure we cut at a User message for clean context
+        for i in range(cutoff_index, 0, -1):
+            if messages[i].type == "human":
+                # Found a user message, cut here
+                cutoff_index = i
+                break
+
+        # Everything before the cutoff index will be clipped
+        messages_to_clip = messages[:cutoff_index]
+        messages_to_keep = messages[cutoff_index:]
+
+        # Debug print
+        print(f"DEBUG: Keeping {len(messages_to_keep)} most recent messages ({current_length} chars)")
+        print(f"DEBUG: Clipping {len(messages_to_clip)} messages")
+
+        # Extract the clipped messages into a string for storing
         clipped_history = ""
         for message in messages_to_clip:
             prefix = "User: " if message.type == "human" else "Assistant: "
@@ -241,7 +251,7 @@ class Session:
         # Create a new ChatMessageHistory with only the messages we want to keep
         new_history = ChatMessageHistory()
 
-        # Add the kept messages to the new history
+        # Add the kept messages to the new history in the correct order
         for message in messages_to_keep:
             if message.type == "human":
                 new_history.add_user_message(message.content)
@@ -254,12 +264,11 @@ class Session:
         # Store the clipped history to a file and create Uploaded_data
         if clipped_history:
             # Create the storage directory if it doesn't exist
-            # Get the project root (assumed to be 3 levels up from this file, same as in Uploaded_data)
             project_root = Path(__file__).resolve().parents[2]
             storage_dir = project_root / 'storage' / 'chat_history_storage'
             os.makedirs(storage_dir, exist_ok=True)
 
-            # Create a unique filename using timestamp
+            # Create a filename using timestamp
             timestamp = int(time.time() * 1000)  # millisecond precision
             history_filename = f"chat_history_{timestamp}.txt"
             history_filepath = storage_dir / history_filename
@@ -267,16 +276,31 @@ class Session:
             # Get existing history content if available
             existing_content = ""
             if self.ltm_session_history is not None and hasattr(self.ltm_session_history, 'data_path'):
-                # Try to read the existing file if it exists
                 try:
                     with open(self.ltm_session_history.data_path, 'r', encoding='utf-8') as f:
                         existing_content = f.read()
                 except (FileNotFoundError, AttributeError):
+                    print(f"DEBUG: Could not read previous history file")
                     pass
+
+            # Clean up old files after retrieving their content
+            try:
+                # Find all chat history files in the directory
+                old_files = glob.glob(str(storage_dir / "chat_history_*.txt"))
+
+                # Delete each one
+                for old_file in old_files:
+                    os.remove(old_file)
+                    print(f"DEBUG: Deleted old history file: {old_file}")
+            except Exception as e:
+                print(f"DEBUG: Error cleaning up old history files: {e}")
 
             # Write combined history to the new file
             with open(history_filepath, 'w', encoding='utf-8') as f:
                 f.write(existing_content + clipped_history)
+
+            # Debug print
+            print(f"DEBUG: Wrote {len(existing_content) + len(clipped_history)} chars to {history_filename}")
 
             # Create or update the Uploaded_data object with the path to this file
             self.ltm_session_history = Uploaded_data("chat_history", str(history_filepath), False)
