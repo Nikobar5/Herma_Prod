@@ -8,6 +8,9 @@ import logging
 from uploaded_data import Uploaded_data
 from rag_querying import query_rag
 import glob
+import os
+import time
+from pathlib import Path
 from count_tokens import estimate_tokens
 
 # Session class represents a chat session, session_id can be used for ordering/organizing chat history,
@@ -28,6 +31,40 @@ class Session:
         self._cancel_generation = False
         self.ltm_session_history = None
 
+        try:
+            # Get the project root
+            project_root = Path(__file__).resolve().parents[2]
+            storage_dir = project_root / 'storage' / 'chat_history_storage'
+
+            # Check if the directory exists before trying to clean it
+            if os.path.exists(storage_dir):
+                # Find all chat history files in the directory
+                old_files = glob.glob(str(storage_dir / "chat_history_*.txt"))
+
+                # Delete each file and its associated vector DB
+                for old_file in old_files:
+                    # Extract the base filename without extension
+                    base_name = os.path.basename(old_file)
+
+                    # Delete the file
+                    os.remove(old_file)
+                    print(f"DEBUG: Deleted old history file during session initialization: {old_file}")
+
+                    # Delete associated vector DB
+                    Uploaded_data.delete_vector_db(base_name)
+                    print(f"DEBUG: Deleted vector DB for: {base_name}")
+
+                print(f"DEBUG: Cleared {len(old_files)} files from chat history storage")
+
+                # We've already deleted all vector DBs associated with chat history files
+            else:
+                # Create the directory if it doesn't exist
+                os.makedirs(storage_dir, exist_ok=True)
+                print(f"DEBUG: Created chat history storage directory")
+
+        except Exception as e:
+            print(f"DEBUG: Error cleaning up chat history storage during initialization: {e}")
+
     # Retrieves chat history from whatever session you are in or creates a new session chat history
     def get_chat_history(self):
         if self.session_history == "":
@@ -43,10 +80,10 @@ class Session:
         # Instantiates the llm to be used, setting the model and context window, other params can also be adjusted
         llm = ChatOllama(model="llama3.2:1b", num_ctx=5000)
         # Get context from all uploaded files selected
-        context = None
+        doc_context = None
         formatted_sources = None
         if self.currently_used_data != []:
-            context = ""
+            doc_context = ""
             source_filenames = []
 
             # Collect results from all databases
@@ -91,7 +128,7 @@ class Session:
                     source_filenames.append((filename, page, section))
 
                 # Join all context pieces
-                context = "\n\n---\n\n".join(context_pieces)
+                doc_context = "\n\n---\n\n".join(context_pieces)
 
             # Create markdown table of sources
             markdown_table = "\n\n**Sources**\n\n| Filename | Page | Section |\n| -------- | ---- | ------- |\n"
@@ -99,9 +136,27 @@ class Session:
                 markdown_table += f"| {filename} | {page} | {section} |\n"
 
             formatted_sources = markdown_table
-            llm.get_num_tokens(context)
+        chat_history_context = ""
+        if self.ltm_session_history is not None:
+            chat_history_context = "This conversation has been going on for a while, here is some relevant context from " \
+                                   "earlier in the conversation that you no longer remember: "
 
-        prompt = make_prompt(input, context, self.currently_used_data)
+            # Get results from the RAG query
+            history_results = query_rag(input, self.ltm_session_history.vector_database_path)
+
+            # Extract and format content from the results
+            if history_results:
+                history_pieces = []
+                for doc, score in history_results:
+                    history_pieces.append(doc.page_content)
+
+                # Join the extracted content
+                chat_history_context += "\n\n".join(history_pieces)
+            else:
+                chat_history_context += "No relevant earlier context found."
+
+
+        prompt = make_prompt(chat_history_context, doc_context, self.currently_used_data)
         chain = prompt | llm
         chain_with_message_history = RunnableWithMessageHistory(
             chain,
@@ -168,10 +223,11 @@ class Session:
         Keeps the most recent messages and trims from the beginning,
         working backwards until the 8000 character limit is reached,
         then finding the next human message to create a clean cut.
+
+        Special case: If the most recent message is over 8000 characters,
+        it keeps that message and the human message that prompted it,
+        and clips all previous messages.
         """
-        import os
-        from pathlib import Path
-        import time
 
         # Get all messages
         messages = self.session_history.messages
@@ -192,7 +248,104 @@ class Session:
             print(f"DEBUG: History under 8000 char limit, no trimming needed.")
             return
 
-        # Start from the most recent message and work backwards
+        # Check for special case: most recent message exceeds 8000 characters
+        # In this case, keep only the most recent exchange (human + assistant)
+        if len(messages) >= 2:
+            last_message = messages[-1]
+            second_last_message = messages[-2]
+
+            # Check if the last message is from assistant and second last is from human
+            if last_message.type == "assistant" and second_last_message.type == "human":
+                # Calculate the length of just this exchange
+                prefix_assistant = "Assistant: "
+                prefix_human = "User: "
+                last_exchange_length = len(prefix_assistant + last_message.content + "\n") + \
+                                       len(prefix_human + second_last_message.content + "\n")
+
+                # If this one exchange is already over 8000 characters or close to it
+                if last_exchange_length > 8000:
+                    print(f"DEBUG: Special case - most recent exchange is {last_exchange_length} chars")
+
+                    # Keep only the most recent exchange
+                    messages_to_keep = [second_last_message, last_message]
+                    messages_to_clip = messages[:-2]  # All messages except the last two
+
+                    # Extract the clipped messages into a string for storing
+                    clipped_history = ""
+                    for message in messages_to_clip:
+                        prefix = "User: " if message.type == "human" else "Assistant: "
+                        clipped_history += f"{prefix}{message.content}\n"
+
+                    # Create a new ChatMessageHistory with only the messages we want to keep
+                    new_history = ChatMessageHistory()
+
+                    # Add the kept messages to the new history
+                    for message in messages_to_keep:
+                        if message.type == "human":
+                            new_history.add_user_message(message.content)
+                        else:
+                            new_history.add_ai_message(message.content)
+
+                    # Replace the old history with the new one
+                    self.session_history = new_history
+
+                    # Handle the clipped history (same as regular case)
+                    if clipped_history:
+                        # Create the storage directory if it doesn't exist
+                        project_root = Path(__file__).resolve().parents[2]
+                        storage_dir = project_root / 'storage' / 'chat_history_storage'
+                        os.makedirs(storage_dir, exist_ok=True)
+
+                        # Get existing history content if available
+                        existing_content = ""
+                        if self.ltm_session_history is not None and hasattr(self.ltm_session_history, 'data_path'):
+                            try:
+                                with open(self.ltm_session_history.data_path, 'r', encoding='utf-8') as f:
+                                    existing_content = f.read()
+                            except (FileNotFoundError, AttributeError):
+                                print(f"DEBUG: Could not read previous history file")
+                                pass
+
+                        # Clean up old files after retrieving their content
+                        try:
+                            # Find all chat history files in the directory
+                            old_files = glob.glob(str(storage_dir / "chat_history_*.txt"))
+
+                            for old_file in old_files:
+                                # Extract the base filename without extension
+                                base_name = os.path.basename(old_file)
+
+                                # Delete the file
+                                os.remove(old_file)
+                                print(f"DEBUG: Deleted old history file: {old_file}")
+
+                                # Delete associated vector DB
+                                Uploaded_data.delete_vector_db(base_name)
+                                print(f"DEBUG: Deleted vector DB for: {base_name}")
+                        except Exception as e:
+                            print(f"DEBUG: Error cleaning up old history files: {e}")
+
+                        # Create a filename using timestamp
+                        timestamp = int(time.time() * 1000)  # millisecond precision
+                        history_filename = f"chat_history_{timestamp}.txt"
+                        history_filepath = storage_dir / history_filename
+
+                        # Write combined history to the new file
+                        with open(history_filepath, 'w', encoding='utf-8') as f:
+                            f.write(existing_content + clipped_history)
+
+                        # Debug print
+                        print(
+                            f"DEBUG: Wrote {len(existing_content) + len(clipped_history)} chars to {history_filename}")
+
+                        # Create or update the Uploaded_data object with the path to this file
+                        self.ltm_session_history = Uploaded_data(history_filename, str(history_filepath), True)
+
+                    print(
+                        f"Special case: Chat history trimmed to just the most recent exchange. {len(messages_to_clip)} messages clipped.")
+                    return  # Exit early since we've handled the special case
+
+        # Regular case: Start from the most recent message and work backwards
         # to find which messages to keep under the 8000 character limit
         messages_to_keep = []
         current_length = 0
@@ -268,11 +421,6 @@ class Session:
             storage_dir = project_root / 'storage' / 'chat_history_storage'
             os.makedirs(storage_dir, exist_ok=True)
 
-            # Create a filename using timestamp
-            timestamp = int(time.time() * 1000)  # millisecond precision
-            history_filename = f"chat_history_{timestamp}.txt"
-            history_filepath = storage_dir / history_filename
-
             # Get existing history content if available
             existing_content = ""
             if self.ltm_session_history is not None and hasattr(self.ltm_session_history, 'data_path'):
@@ -288,12 +436,25 @@ class Session:
                 # Find all chat history files in the directory
                 old_files = glob.glob(str(storage_dir / "chat_history_*.txt"))
 
-                # Delete each one
+                # Delete each one and its associated vector DB
                 for old_file in old_files:
+                    # Extract the base filename without extension
+                    base_name = os.path.basename(old_file)
+
+                    # Delete the file
                     os.remove(old_file)
                     print(f"DEBUG: Deleted old history file: {old_file}")
+
+                    # Delete associated vector DB
+                    Uploaded_data.delete_vector_db(base_name)
+                    print(f"DEBUG: Deleted vector DB for: {base_name}")
             except Exception as e:
                 print(f"DEBUG: Error cleaning up old history files: {e}")
+
+            # Create a filename using timestamp
+            timestamp = int(time.time() * 1000)  # millisecond precision
+            history_filename = f"chat_history_{timestamp}.txt"
+            history_filepath = storage_dir / history_filename
 
             # Write combined history to the new file
             with open(history_filepath, 'w', encoding='utf-8') as f:
@@ -303,6 +464,6 @@ class Session:
             print(f"DEBUG: Wrote {len(existing_content) + len(clipped_history)} chars to {history_filename}")
 
             # Create or update the Uploaded_data object with the path to this file
-            self.ltm_session_history = Uploaded_data("chat_history", str(history_filepath), False)
+            self.ltm_session_history = Uploaded_data(history_filename, str(history_filepath), False)
 
         print(f"Chat history trimmed: {len(messages_to_clip)} messages clipped, {len(messages_to_keep)} messages kept")

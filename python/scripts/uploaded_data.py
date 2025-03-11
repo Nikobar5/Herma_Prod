@@ -232,7 +232,7 @@ class Uploaded_data:
 
     def split_documents(self):
         text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=500,
+            chunk_size=300,
             chunk_overlap=50,
             length_function=len,
             is_separator_regex=False,

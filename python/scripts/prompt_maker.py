@@ -8,7 +8,7 @@ from uploaded_data import Uploaded_data
 # how many docs are selected, names of the docs selected, etc.
 
 
-def make_prompt(input, context, currently_used_data):
+def make_prompt(chat_history_context, context, currently_used_data):
     if context:
         # Escape curly braces in context before using it in an f-string
         safe_context = context.replace('{', '{{').replace('}', '}}')
@@ -37,7 +37,10 @@ def make_prompt(input, context, currently_used_data):
         {doc_summaries_str}
         
         Here is the provided context extracted from these documents:
-        {safe_context}"""
+        {safe_context}
+
+        {chat_history_context}"""
+
 
         prompt = ChatPromptTemplate.from_messages([
             (
@@ -52,7 +55,8 @@ def make_prompt(input, context, currently_used_data):
         prompt = ChatPromptTemplate.from_messages([
             (
                 "system",
-                "You are a helpful AI assistant named Herma. Answer all questions to the best of your ability.",
+                "You are a helpful AI assistant named Herma. Answer all questions to the best of your ability. "
+                + chat_history_context,
             ),
             MessagesPlaceholder(variable_name="chat_history"),
             ("human", "{input}"),

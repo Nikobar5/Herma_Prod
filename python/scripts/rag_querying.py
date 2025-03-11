@@ -23,7 +23,7 @@ def query_rag(query_text: str, vector_database_directory):
 
     # Search the DB.
     start_time = time.time()
-    results = db.similarity_search_with_score(safe_query_text, k=5)  # Retrieve top 5 from each database
+    results = db.similarity_search_with_score(safe_query_text, k=4)  # Retrieve top 4 from each database
     end_time = time.time()
     print(f"Execution time for rag search is: {end_time - start_time:.6f} seconds")
 
