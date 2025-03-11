@@ -155,7 +155,6 @@ class Session:
             else:
                 chat_history_context += "No relevant earlier context found."
 
-
         prompt = make_prompt(chat_history_context, doc_context, self.currently_used_data)
         chain = prompt | llm
         chain_with_message_history = RunnableWithMessageHistory(
@@ -167,18 +166,48 @@ class Session:
 
         # Stream the model's response
         content_yielded = False
-        for chunk in chain_with_message_history.stream({"input": input}):
-            if self._cancel_generation:
-                # Stop the generation
-                return
-            content_yielded = True
-            yield chunk.content
+        accumulated_response = ""  # Track the accumulated response
+        was_interrupted = False  # Flag to track if interruption happened
 
-        # After the model finishes, yield the sources if available
-        if formatted_sources is not None and content_yielded:
-            # One final check before yielding sources
-            if self._cancel_generation:
-                return
+        try:
+            for chunk in chain_with_message_history.stream({"input": input}):
+                if self._cancel_generation:
+                    was_interrupted = True
+                    break  # Exit the loop but continue to our handler below
+
+                content_yielded = True
+                accumulated_response += chunk.content  # Build up the full response
+                yield chunk.content
+
+            # After streaming finishes (or is interrupted), check if we need to handle manually
+            if was_interrupted and content_yielded:
+                # Get the current messages to check if our user message is already there
+                current_messages = self.get_chat_history().messages
+
+                # Check if the user message is already in history
+                user_message_exists = False
+                for msg in reversed(current_messages):
+                    if msg.type == "human" and msg.content == input:
+                        user_message_exists = True
+                        break
+
+                # Add the user message only if needed
+                if not user_message_exists:
+                    self.get_chat_history().add_user_message(input)
+
+                # Add the interrupted AI response with the notice
+                interrupted_response = accumulated_response + " [User interrupted response]"
+                self.get_chat_history().add_ai_message(interrupted_response)
+        except Exception as e:
+            print(f"Error during streaming: {e}")
+            if content_yielded:
+                # Handle interruptions caused by errors
+                self.get_chat_history().add_user_message(input)
+                self.get_chat_history().add_ai_message(accumulated_response + " [User intentionally interrupted "
+                                                                              "response here]")
+
+        # Sources handling for normal completion
+        if not was_interrupted and formatted_sources is not None and content_yielded:
             yield formatted_sources
 
         self.num_exchanges += 1
