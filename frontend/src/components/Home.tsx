@@ -25,10 +25,41 @@ interface ClickTimer {
   [key: string]: number;
 }
 
+const saveMessagesToStorage = (messages: Message[]) => {
+  try {
+    localStorage.setItem('chat_messages', JSON.stringify(messages));
+    localStorage.setItem('chat_timestamp', Date.now().toString());
+  } catch (error) {
+    console.error("Error saving messages to localStorage:", error);
+  }
+};
+
+// Load messages from localStorage
+const loadMessagesFromStorage = (): Message[] => {
+  try {
+    const storedMessages = localStorage.getItem('chat_messages');
+    return storedMessages ? JSON.parse(storedMessages) : [];
+  } catch (error) {
+    console.error("Error loading messages from localStorage:", error);
+    return [];
+  }
+};
+
+// Check if we have a stored session
+const hasStoredSession = (): boolean => {
+  return localStorage.getItem('chat_messages') !== null;
+};
+
+// Clear stored session
+const clearStoredSession = () => {
+  localStorage.removeItem('chat_messages');
+  localStorage.removeItem('chat_timestamp');
+};
+
 const Home: React.FC = () => {
   const [chatMessage, setChatMessage] = useState("");
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [hasStarted, setHasStarted] = useState(false);
+  const [messages, setMessages] = useState<Message[]>(() => loadMessagesFromStorage());
+  const [hasStarted, setHasStarted] = useState<boolean>(() => messages.length > 0);
   const [loading, setLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([]);
@@ -62,41 +93,77 @@ const Home: React.FC = () => {
   };
 
       // First, add a new function to reset everything
-    const handleNewChat = async () => {
-      // Interrupt any ongoing response first
-      if (loading || isStreaming) {
-        try {
-          await ipcRenderer.invoke('interrupt-chat');
-        } catch (error) {
-          console.error("Error interrupting chat:", error);
-        }
+const handleNewChat = async () => {
+  // Interrupt any ongoing response first
+  if (loading || isStreaming) {
+    try {
+      await ipcRenderer.invoke('interrupt-chat');
+    } catch (error) {
+      console.error("Error interrupting chat:", error);
+    }
+  }
+
+  // Clear input text
+  setChatMessage("");
+
+  // Reset states
+  setLoading(false);
+  setIsStreaming(false);
+  setAutoScroll(true);
+  setUserHasScrolled(false);
+
+  // Clear messages
+  setMessages([]);
+
+  // Reset hasStarted state
+  setHasStarted(false);
+
+  // Clear selected files
+  setSelectedFiles([]);
+
+  // Clear the stored session
+  clearStoredSession();
+
+  try {
+    // Tell the backend to reset the session
+    await ipcRenderer.invoke('new-session');
+  } catch (error) {
+    console.error("Error creating new session:", error);
+  }
+};
+
+useEffect(() => {
+  // Listen for visibility changes (which can happen during sleep/wake)
+  const handleVisibilityChange = () => {
+    if (document.visibilityState === 'visible') {
+      // Page is now visible (e.g., after sleep)
+      console.log("App woke from sleep/background, restoring state");
+
+      // If we're in the middle of streaming when the computer went to sleep,
+      // we should notify the user and reset the streaming state
+      if (isStreaming) {
+        setIsStreaming(false);
+        setLoading(false);
+
+        // Add a message indicating the stream was interrupted
+        setMessages(prevMessages => [
+          ...prevMessages,
+          {
+            text: "Connection was interrupted. Your previous message might not have been fully processed.",
+            htmlContent: marked("Connection was interrupted. Your previous message might not have been fully processed.") as string,
+            isUser: false
+          }
+        ]);
       }
+    }
+  };
 
-      // Clear input text
-      setChatMessage("");
+  document.addEventListener('visibilitychange', handleVisibilityChange);
 
-      // Reset states
-      setLoading(false);
-      setIsStreaming(false);
-      setAutoScroll(true);
-      setUserHasScrolled(false);
-
-      // Clear messages
-      setMessages([]);
-
-      // Reset hasStarted state
-      setHasStarted(false);
-
-      // Clear selected files
-      setSelectedFiles([]);
-
-      try {
-        // Tell the backend to reset the session
-        await ipcRenderer.invoke('new-session');
-      } catch (error) {
-        console.error("Error creating new session:", error);
-      }
-    };
+  return () => {
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+  };
+}, [isStreaming]);
 
     // Set up scroll event listener to detect manual scrolling
     useEffect(() => {
@@ -107,7 +174,7 @@ const Home: React.FC = () => {
         // Only consider this a manual scroll if we're streaming and not already at bottom
         if (isStreaming) {
           const nearBottom = isNearBottom();
-          
+
           // If user has scrolled away from bottom during streaming
           if (!nearBottom && !userHasScrolled) {
             setUserHasScrolled(true);
@@ -121,6 +188,13 @@ const Home: React.FC = () => {
         messageDisplay.removeEventListener('scroll', handleScroll);
       };
     }, [isStreaming, userHasScrolled]);
+
+    useEffect(() => {
+  if (messages.length > 0) {
+    saveMessagesToStorage(messages);
+    setHasStarted(true);
+  }
+}, [messages]);
 
     useEffect(() => {
       // When user sends a message, always scroll to bottom and reset scroll tracking
