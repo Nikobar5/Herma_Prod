@@ -39,24 +39,26 @@ const Home: React.FC = () => {
   const [isStreaming, setIsStreaming] = useState(false);
 
   const [autoScroll, setAutoScroll] = useState(true);
+  const [userHasScrolled, setUserHasScrolled] = useState(false);
   const messageDisplayRef = useRef<HTMLDivElement | null>(null);
   const messageEndRef = useRef<HTMLDivElement | null>(null);
-  const isNearBottomRef = useRef(true);
   const [charCount, setCharCount] = useState(0);
   const MAX_CHARS = 3000;
 
+  const isNearBottom = () => {
+    if (messageDisplayRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = messageDisplayRef.current;
+      // Consider "near bottom" if within 50px of the bottom
+      return scrollHeight - scrollTop - clientHeight < 50;
+    }
+    return true;
+  };
+
+  // Function to scroll to bottom
   const scrollToBottom = () => {
     if (messageEndRef.current && autoScroll) {
       messageEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
-  };
-
-  const checkIfNearBottom = () => {
-    if (messageDisplayRef.current) {
-      const { scrollTop, scrollHeight, clientHeight } = messageDisplayRef.current;
-      return scrollHeight - scrollTop - clientHeight < 50;
-    }
-    return true;
   };
 
       // First, add a new function to reset everything
@@ -76,6 +78,8 @@ const Home: React.FC = () => {
       // Reset states
       setLoading(false);
       setIsStreaming(false);
+      setAutoScroll(true);
+      setUserHasScrolled(false);
 
       // Clear messages
       setMessages([]);
@@ -94,37 +98,21 @@ const Home: React.FC = () => {
       }
     };
 
-    useEffect(() => {
-      // When user sends a message, always scroll to bottom
-      const isNewUserMessage =
-        messages.length > 0 &&
-        messages[messages.length - 1].isUser;
-
-      if (isNewUserMessage) {
-        setAutoScroll(true);
-        scrollToBottom();
-      } else if (autoScroll) {
-        // Only scroll if auto-scroll is enabled
-        scrollToBottom();
-      }
-    }, [messages, autoScroll]);
-
+    // Set up scroll event listener to detect manual scrolling
     useEffect(() => {
       const messageDisplay = messageDisplayRef.current;
       if (!messageDisplay) return;
 
       const handleScroll = () => {
-        const isNearBottom = checkIfNearBottom();
-        isNearBottomRef.current = isNearBottom;
-
-        // If user manually scrolls to bottom during loading, re-enable auto-scroll
-        if (isNearBottom && loading) {
-          setAutoScroll(true);
-        }
-
-        // If user scrolls away from bottom during loading, disable auto-scroll
-        if (!isNearBottom && loading) {
-          setAutoScroll(false);
+        // Only consider this a manual scroll if we're streaming and not already at bottom
+        if (isStreaming) {
+          const nearBottom = isNearBottom();
+          
+          // If user has scrolled away from bottom during streaming
+          if (!nearBottom && !userHasScrolled) {
+            setUserHasScrolled(true);
+            setAutoScroll(false);
+          }
         }
       };
 
@@ -132,12 +120,28 @@ const Home: React.FC = () => {
       return () => {
         messageDisplay.removeEventListener('scroll', handleScroll);
       };
-    }, [loading]);
+    }, [isStreaming, userHasScrolled]);
+
+    useEffect(() => {
+      // When user sends a message, always scroll to bottom and reset scroll tracking
+      const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
+      const isNewUserMessage = lastMessage && lastMessage.isUser;
+  
+      if (isNewUserMessage) {
+        setAutoScroll(true);
+        setUserHasScrolled(false);
+        scrollToBottom();
+      } else if (autoScroll) {
+        // For bot messages, only scroll if auto-scroll is still enabled
+        scrollToBottom();
+      }
+    }, [messages, autoScroll]);
 
 const handleChatInput = async (event: React.ChangeEvent<HTMLTextAreaElement>) => {
   const textarea = event.target;
   const newText = event.target.value;
 
+  setCharCount(newText.length);
   // Check if this is likely a paste operation (sudden large text increase)
   const isProbablyPaste = chatMessage.length + 10 < newText.length && newText.length > MAX_CHARS;
 
@@ -225,8 +229,7 @@ const handleChatInput = async (event: React.ChangeEvent<HTMLTextAreaElement>) =>
   };
 
   useEffect(() => {
-const messageHandler = (_event: any, chunk: string) => {
-  const wasNearBottom = checkIfNearBottom();
+  const messageHandler = (_event: any, chunk: string) => {
   console.log("Received chunk:", chunk);
   if (chunk === '[DONE]') {
     console.log("Received DONE signal, stopping stream");
@@ -238,6 +241,8 @@ const messageHandler = (_event: any, chunk: string) => {
   // If this is the first chunk, set isStreaming to true
   if (!isStreaming) {
     setIsStreaming(true);
+    setUserHasScrolled(false);
+    setAutoScroll(true);
   }
 
   setMessages(prevMessages => {
@@ -260,7 +265,10 @@ const messageHandler = (_event: any, chunk: string) => {
       }];
     }
   });
-  setAutoScroll(wasNearBottom);
+
+  if (autoScroll) {
+    scrollToBottom();
+  }
 };
 
 
@@ -268,7 +276,7 @@ const messageHandler = (_event: any, chunk: string) => {
     return () => {
       ipcRenderer.removeListener('chat-response', messageHandler);
     };
-  }, []);
+  }, [autoScroll, isStreaming, userHasScrolled]);
 
 const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (loading || isStreaming) {
@@ -429,6 +437,8 @@ const handleSubmit = async (event: React.FormEvent) => {
   setIsStreaming(false); // Reset streaming state
   setChatMessage("");
   setHasStarted(true);
+  setUserHasScrolled(false);
+  setAutoScroll(true);
 
   const textarea = document.querySelector('.chat-input') as HTMLTextAreaElement;
   if (textarea) {
@@ -535,7 +545,7 @@ const handleSubmit = async (event: React.FormEvent) => {
       <div className={`sidebar-container ${!isSidebarOpen ? 'closed' : ''}`}>
         <div className={`sidebar ${isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
           <div className="logo-container">
-            <h2>Herma</h2>
+            <h2>HΞRMΛ</h2>
           </div>
           <div className="files-section">
           <div className="files-header">
@@ -680,6 +690,11 @@ const handleSubmit = async (event: React.FormEvent) => {
         rows={1}
         style={{ height: 'auto' }}
       />
+      {charCount > 0 && (
+                <div className={`char-count ${charCount > MAX_CHARS * 0.9 ? 'char-count-warning' : 'char-count-normal'}`}>
+                  {charCount}/{MAX_CHARS}
+                </div>
+                )}
     </div>
     <div className="chat-buttons-container">
               <label className={`upload-button ${(loading || isStreaming) ? 'disabled' : ''}`}
@@ -749,7 +764,7 @@ const handleSubmit = async (event: React.FormEvent) => {
           <div className="centered-start">
             <div className="chat-header">
               <img src="Herma.jpeg" alt="Logo-Center" className="logo-Center" />
-              <span className="center-title" contentEditable="true">Herma</span>
+              <span className="center-title" contentEditable="true">HΞRMΛ</span>
             </div>
             {loading && <div className="loading">Loading...</div>}
             <form className="chat-form-centered" onSubmit={handleSubmit}>
@@ -764,6 +779,11 @@ const handleSubmit = async (event: React.FormEvent) => {
                     rows={1}
                     style={{ height: 'auto' }}
                   />
+                {charCount > 0 && (
+                  <div className={`char-count ${charCount > MAX_CHARS * 0.9 ? 'char-count-warning' : 'char-count-normal'}`}>
+                    {charCount}/{MAX_CHARS}
+                  </div>
+                )}
               </div>
                     <label className={`upload-button ${(loading || isStreaming) ? 'disabled' : ''}`}
                            data-tooltip={`${(loading || isStreaming) ? 'Please wait until response completes' : 'Select files to upload'}`}>

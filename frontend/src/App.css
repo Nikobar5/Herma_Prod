@@ -80,7 +80,6 @@ body {
 /************* Tooltips ****************/
 [data-tooltip] {
   position: relative;
-  z-index: 2000;
 }
 
 [data-tooltip]:before,
@@ -88,9 +87,9 @@ body {
   visibility: hidden;
   opacity: 0;
   pointer-events: none;
-  transition: all 0.5s ease;
+  transition: all 0.1s ease;
   position: absolute;
-  z-index: 1800;
+  z-index: 1900;
 }
 
 [data-tooltip]:before {
@@ -251,7 +250,7 @@ body {
   justify-content: center;
   transition: background-color 0.2s ease;
   flex: 4;
-  z-index: 1600;
+  z-index: 1100;
 
   width: 36px;
   height: 36px;
@@ -280,7 +279,7 @@ body {
 .logo-container > h2 {
   font-size: var(--h3-size);
   color: var(--text-color);
-  font-family: 'Times New Roman', Times, serif;
+  /*font-family: 'Times New Roman', Times, serif;*/
 }
 
 .files-section {
@@ -498,7 +497,7 @@ body {
 .center-title {
   font-size: var(--h1-size);
   cursor: text;
-  font-family: 'Times New Roman', Times, serif;
+  /*font-family: 'Times New Roman', Times, serif;*/
 }
 
 .loading {
@@ -645,26 +644,6 @@ body {
   max-width: 100%;
 }
 
-.input-container {
-  display: flex;
-  gap: 1rem;
-  flex: 1;
-  font-size: var(--font-size);
-  background-color: var(--secondary-bg);
-  border-radius: 20px;
-  z-index: 100;
-  box-shadow: inset 1px 2px 4px rgba(0, 0, 0, 0.2);
-  max-width: calc(var(--chat-max-width) - 130px);
-  min-height: 2rem; /* Minimum height */
-  max-height: 15rem; /* Maximum height */
-  height: auto;
-  overflow-y: auto; /* Add scrollbar when content exceeds max height */
-  display: flex;
-  align-items: flex-start; /* Align to top instead of center */
-  padding: 0.75rem 1rem;
-  width: 100%;
-}
-
 .chat-buttons-container {
   display: flex;
   justify-content: center;
@@ -758,6 +737,32 @@ body {
   border-radius: 4px;
 }
 /************* Chat ****************/
+
+/************* Character Counter ****************/
+.input-container {
+  position: relative; /* Ensure absolute positioning works relative to this container */
+}
+
+.char-count {
+  position: absolute;
+  bottom: 8px;
+  right: 15px;
+  font-size: 0.7rem;
+  opacity: 0.7;
+  user-select: none; /* Prevent selection of the counter text */
+  pointer-events: none; /* Makes sure it doesn't interfere with clicking */
+  background: transparent;
+  z-index: 5; /* Ensures it appears above the textarea */
+}
+
+.char-count-warning {
+  color: #ef4444; /* Red color for when approaching limit */
+}
+
+.char-count-normal {
+  color: var(--text-color); /* Use your text color variable */
+}
+/************* Character Counter ****************/
 
 /************* Rich Text ****************/
 .rich-text {
@@ -996,3 +1001,83 @@ body {
   font-style: italic;
 }
 /************* Rich Text ****************/
+
+/************* Input Container ****************/
+.input-container {
+  position: relative;
+  display: flex;
+  gap: 1rem;
+  flex: 1;
+  font-size: var(--font-size);
+  background-color: var(--secondary-bg); /* Solid background color */
+  border-radius: 20px;
+  z-index: 100;
+  box-shadow: inset 1px 2px 4px rgba(0, 0, 0, 0.2),
+              0 2px 10px rgba(0, 0, 0, 0.1); /* Add an outer shadow for depth */
+  max-width: calc(var(--chat-max-width) - 80px);
+  min-height: 2rem; /* Minimum height */
+  max-height: 15rem; /* Maximum height */
+  height: auto;
+  overflow-y: auto; /* Add scrollbar when content exceeds max height */
+  align-items: flex-start; /* Align to top instead of center */
+  padding: 0.75rem 1rem;
+  width: 100%;
+  
+  z-index: 100;
+}
+
+/* Ensure complete opacity by adding a solid background */
+.input-container::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--secondary-bg); /* Same as container */
+  border-radius: 20px;
+  z-index: -1; /* Behind the content */
+  opacity: 1; /* Fully opaque */
+}
+
+/* Add styles specifically for when the container is in the centered start view */
+.chat-form-centered .input-container {
+  background-color: var(--secondary-bg);
+  opacity: 1;
+}
+
+/* Make sure the form sits above messages */
+.chat-form {
+  z-index: 99;
+  background: transparent;
+}
+
+.input-bar-buttons {
+  z-index: 99;
+}
+
+/* Updated chat input styles */
+.chat-input {
+  flex: 1;
+  background: transparent; /* This is fine since parent is opaque */
+  border: none;
+  outline: none;
+  color: var(--text-color);
+  font-size: var(--font-size);
+  font-family: var(--font);
+  min-height: 1.5rem;
+  max-height: 13rem;
+  resize: none;
+  overflow-y: auto;
+  line-height: 1.5;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+  position: relative;
+  z-index: 2; /* Above the pseudo-element */
+}
+
+/* In case the input area becomes visible when typing a lot */
+.message-display {
+  padding-bottom: 120px; /* Add extra padding at the bottom to accommodate the input area */
+}
