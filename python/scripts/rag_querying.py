@@ -6,7 +6,7 @@ import string
 from uploaded_data import Uploaded_data
 
 # Queries the RAG with a given input
-def query_rag(query_text: str, vector_database_directory):
+def query_rag(query_text: str, vector_database_directory, k_value):
     # Prepare the DB.
     safe_query_text = query_text.replace('{', '{{').replace('}', '}}')
     start_time = time.time()
@@ -23,7 +23,7 @@ def query_rag(query_text: str, vector_database_directory):
 
     # Search the DB.
     start_time = time.time()
-    results = db.similarity_search_with_score(safe_query_text, k=4)  # Retrieve top 4 from each database
+    results = db.similarity_search_with_score(safe_query_text, k=k_value)  # Retrieve top k chunks from each database
     end_time = time.time()
     print(f"Execution time for rag search is: {end_time - start_time:.6f} seconds")
 

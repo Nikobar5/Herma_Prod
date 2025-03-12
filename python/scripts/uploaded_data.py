@@ -232,7 +232,7 @@ class Uploaded_data:
 
     def split_documents(self):
         text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=300,
+            chunk_size=400,
             chunk_overlap=50,
             length_function=len,
             is_separator_regex=False,
@@ -367,7 +367,9 @@ class Uploaded_data:
 
         # Extract text from chunks
         sample_text = "\n\n---\n\n".join([chunk.page_content for chunk in sample_chunks])
-
+        middle_index = len(sample_text) // 2
+        first_half = sample_text[:middle_index]  # "Hello"
+        second_half = sample_text[middle_index:]
         # Create a summarization prompt
         summary_prompt = f"""
         Below is text from the first and last parts of a document titled '{self.name}'. 
@@ -377,11 +379,14 @@ class Uploaded_data:
         Format your response as a paragraph without bullet points.
 
         DOCUMENT TEXT:
-        {sample_text}
+        Here are the first two chunks at the beginning, likely containing title, author, date, intro
+        {first_half}
+        Here are the last two chunks at the end of the doc, likely containing conclusion or references
+        {second_half}
         """
 
         # Initialize LLM and generate summary
-        llm = ChatOllama(model="llama3.2:1b")
+        llm = ChatOllama(model="llama3.2:1b", temperature=0.5, num_predict=50)
         result = llm.invoke(summary_prompt)
 
         return result.content

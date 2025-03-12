@@ -7,11 +7,12 @@
     "dev:frontend": "cd frontend && vite",
     "dev:electron": "cross-env NODE_ENV=development tsc -p electron/tsconfig.json && electron electron/dist/main.js",
     "build": "npm run build:frontend && npm run build:electron",
-    "build:frontend": "tsc && vite build",
+    "build:frontend": "cd frontend && tsc && vite build",
     "build:electron": "tsc -p electron/tsconfig.json",
     "install-all": "npm install && python3 -m pip install -r python/requirements.txt",
     "lint": "eslint .",
-    "clean": "rimraf electron/dist frontend/dist"
+    "clean": "rimraf electron/dist frontend/dist",
+    "test:built": "electron electron/dist/main.js"
   },
   "dependencies": {
     "@types/marked": "^6.0.0",

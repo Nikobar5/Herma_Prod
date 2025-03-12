@@ -78,7 +78,7 @@ class Session:
         """
         self._cancel_generation = False
         # Instantiates the llm to be used, setting the model and context window, other params can also be adjusted
-        llm = ChatOllama(model="llama3.2:1b", num_ctx=5000)
+        llm = ChatOllama(model="llama3.2:1b", num_ctx=5000, temperature=0.5, repeat_penalty=1.3)
         # Get context from all uploaded files selected
         doc_context = None
         formatted_sources = None
@@ -90,7 +90,7 @@ class Session:
             all_results = []
             for data in self.currently_used_data:
                 # Query the vector database and collect results with their scores
-                results = query_rag(input, data.vector_database_path)
+                results = query_rag(input, data.vector_database_path, 3)
 
                 # Add document name to metadata for each result
                 for doc, score in results:
@@ -142,7 +142,7 @@ class Session:
                                    "earlier in the conversation that you no longer remember: "
 
             # Get results from the RAG query
-            history_results = query_rag(input, self.ltm_session_history.vector_database_path)
+            history_results = query_rag(input, self.ltm_session_history.vector_database_path, 3)
 
             # Extract and format content from the results
             if history_results:
@@ -248,12 +248,12 @@ class Session:
 
     def trim_chat_history(self):
         """
-        Trims the chat history if it exceeds 8000 characters.
+        Trims the chat history if it exceeds x characters.
         Keeps the most recent messages and trims from the beginning,
-        working backwards until the 8000 character limit is reached,
+        working backwards until the x character limit is reached,
         then finding the next human message to create a clean cut.
 
-        Special case: If the most recent message is over 8000 characters,
+        Special case: If the most recent message is over x characters,
         it keeps that message and the human message that prompted it,
         and clips all previous messages.
         """
@@ -273,11 +273,11 @@ class Session:
         print(f"DEBUG: Current history length: {total_length} characters")
 
         # If under the limit, no need to trim
-        if total_length <= 8000:
-            print(f"DEBUG: History under 8000 char limit, no trimming needed.")
+        if total_length <= 4000:
+            print(f"DEBUG: History under x char limit, no trimming needed.")
             return
 
-        # Check for special case: most recent message exceeds 8000 characters
+        # Check for special case: most recent message exceeds x characters
         # In this case, keep only the most recent exchange (human + assistant)
         if len(messages) >= 2:
             last_message = messages[-1]
@@ -291,8 +291,8 @@ class Session:
                 last_exchange_length = len(prefix_assistant + last_message.content + "\n") + \
                                        len(prefix_human + second_last_message.content + "\n")
 
-                # If this one exchange is already over 8000 characters or close to it
-                if last_exchange_length > 8000:
+                # If this one exchange is already over x characters or close to it
+                if last_exchange_length > 4000:
                     print(f"DEBUG: Special case - most recent exchange is {last_exchange_length} chars")
 
                     # Keep only the most recent exchange
@@ -375,7 +375,7 @@ class Session:
                     return  # Exit early since we've handled the special case
 
         # Regular case: Start from the most recent message and work backwards
-        # to find which messages to keep under the 8000 character limit
+        # to find which messages to keep under the x character limit
         messages_to_keep = []
         current_length = 0
 
@@ -387,7 +387,7 @@ class Session:
             message_length = len(message_text)
 
             # If adding this message would exceed the limit, stop here
-            if current_length + message_length > 8000:
+            if current_length + message_length > 4000:
                 break
 
             # This message fits, so keep it

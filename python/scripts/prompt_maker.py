@@ -9,6 +9,8 @@ from uploaded_data import Uploaded_data
 
 
 def make_prompt(chat_history_context, context, currently_used_data):
+    safe_chat_history_context = chat_history_context.replace('{', '{{').replace('}', '}}')
+
     if context:
         # Escape curly braces in context before using it in an f-string
         safe_context = context.replace('{', '{{').replace('}', '}}')
@@ -39,14 +41,17 @@ def make_prompt(chat_history_context, context, currently_used_data):
         Here is the provided context extracted from these documents:
         {safe_context}
 
-        {chat_history_context}"""
+        {safe_chat_history_context}"""
 
 
         prompt = ChatPromptTemplate.from_messages([
             (
                 "system",
-                "You are a helpful AI assistant named Herma. Answer all questions to the best of your ability based on "
-                "the provided context." + context_addition,
+                "You are a helpful AI assistant named Herma. If the question is ambiguous or you don't know the answer,"
+                " ask clarifying questions or say you don't know the answer. Answer the most recent question to the "
+                "best of your ability based on "
+                "the provided context. If the documents don't provide an answer to the question, then say so" +
+                context_addition + "Here is the conversation history:",
             ),
             MessagesPlaceholder(variable_name="chat_history"),
             ("human", "{input}"),
@@ -55,8 +60,10 @@ def make_prompt(chat_history_context, context, currently_used_data):
         prompt = ChatPromptTemplate.from_messages([
             (
                 "system",
-                "You are a helpful AI assistant named Herma. Answer all questions to the best of your ability. "
-                + chat_history_context,
+                "You are a helpful AI assistant named Herma. If the question is ambiguous or you don't know the answer,"
+                " ask clarifying questions or say you don't know the answer. Answer the most recent question to the "
+                "best of your ability. "
+                + safe_chat_history_context + "Here is the conversation history:"
             ),
             MessagesPlaceholder(variable_name="chat_history"),
             ("human", "{input}"),
