@@ -288,7 +288,7 @@ class PythonServer:
             shutil.move(filepath, destination)
 
             # Create uploaded data object with the file
-            file_data = Uploaded_data(filename, str(destination), True)
+            file_data = Uploaded_data(filename, str(destination), True, 400)
 
             # Add to data store
             self.uploaded_data_store.add(file_data)

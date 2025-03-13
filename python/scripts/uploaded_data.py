@@ -37,9 +37,10 @@ from PIL import Image  # for images
 
 
 class Uploaded_data:
-    def __init__(self, name, data_path, non_chat_history):
+    def __init__(self, name, data_path, non_chat_history, chunk_size):
         self.non_chat_history = non_chat_history
         self.name = name
+        self.chunk_size = chunk_size
 
         self.data_path = data_path
         start_time = time.time()
@@ -232,7 +233,7 @@ class Uploaded_data:
 
     def split_documents(self):
         text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=400,
+            chunk_size=self.chunk_size,
             chunk_overlap=50,
             length_function=len,
             is_separator_regex=False,
@@ -360,33 +361,45 @@ class Uploaded_data:
 
         # If we have fewer than 4 chunks, use all available chunks
         sample_chunks = []
-        if len(chunks) >= 4:
+        is_full_document = len(chunks) < 4
+        if not is_full_document:
             sample_chunks = chunks[:2] + chunks[-2:]
         else:
             sample_chunks = chunks
 
         # Extract text from chunks
         sample_text = "\n\n---\n\n".join([chunk.page_content for chunk in sample_chunks])
-        middle_index = len(sample_text) // 2
-        first_half = sample_text[:middle_index]  # "Hello"
-        second_half = sample_text[middle_index:]
-        # Create a summarization prompt
-        summary_prompt = f"""
-        Below is text from the first and last parts of a document titled '{self.name}'. 
+        if is_full_document:
+            summary_prompt = f"""
+            Below is the full text of a document titled '{self.name}'. 
 
-        Please provide a TWO-SENTENCE summary of what this document is about.
-        Include any information about: title, author, publishing date, main topic, key implications. 
-        Format your response as a paragraph without bullet points.
+            Please provide a TWO-SENTENCE summary of what this document is about.
+            Include any information about: title, author, publishing date, main topic, key implications. 
+            Format your response without bullet points.
 
-        DOCUMENT TEXT:
-        Here are the first two chunks at the beginning, likely containing title, author, date, intro
-        {first_half}
-        Here are the last two chunks at the end of the doc, likely containing conclusion or references
-        {second_half}
-        """
+            DOCUMENT TEXT:
+            {sample_text}
+            """
+        else:
+            middle_index = len(sample_text) // 2
+            first_half = sample_text[:middle_index]
+            second_half = sample_text[middle_index:]
+            summary_prompt = f"""
+            Below is text from the first and last parts of a document titled '{self.name}'. 
+
+            Please provide a TWO-SENTENCE summary of what this document is about.
+            Include any information about: title, author, publishing date, main topic, key implications. 
+            Format your response without bullet points.
+
+            DOCUMENT TEXT:
+            Here are the first two chunks at the beginning, likely containing title, author, date, intro
+            {first_half}
+            Here are the last two chunks at the end of the doc, likely containing conclusion or references
+            {second_half}
+            """
 
         # Initialize LLM and generate summary
-        llm = ChatOllama(model="llama3.2:1b", temperature=0.5, num_predict=50)
+        llm = ChatOllama(model="llama3.2:1b", temperature=0.5, num_predict=100)
         result = llm.invoke(summary_prompt)
 
         return result.content
