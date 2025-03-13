@@ -78,7 +78,7 @@ class Session:
         """
         self._cancel_generation = False
         # Instantiates the llm to be used, setting the model and context window, other params can also be adjusted
-        llm = ChatOllama(model="llama3.2:1b", num_ctx=5000, temperature=0.5, repeat_penalty=1.3)
+        llm = ChatOllama(model="llama3.2:1b", num_ctx=4000, temperature=0.6, repeat_penalty=1.2)
         # Get context from all uploaded files selected
         doc_context = None
         formatted_sources = None
@@ -368,7 +368,7 @@ class Session:
                             f"DEBUG: Wrote {len(existing_content) + len(clipped_history)} chars to {history_filename}")
 
                         # Create or update the Uploaded_data object with the path to this file
-                        self.ltm_session_history = Uploaded_data(history_filename, str(history_filepath), True)
+                        self.ltm_session_history = Uploaded_data(history_filename, str(history_filepath), True, 200)
 
                     print(
                         f"Special case: Chat history trimmed to just the most recent exchange. {len(messages_to_clip)} messages clipped.")
@@ -493,6 +493,6 @@ class Session:
             print(f"DEBUG: Wrote {len(existing_content) + len(clipped_history)} chars to {history_filename}")
 
             # Create or update the Uploaded_data object with the path to this file
-            self.ltm_session_history = Uploaded_data(history_filename, str(history_filepath), False)
+            self.ltm_session_history = Uploaded_data(history_filename, str(history_filepath), False, 200)
 
         print(f"Chat history trimmed: {len(messages_to_clip)} messages clipped, {len(messages_to_keep)} messages kept")
