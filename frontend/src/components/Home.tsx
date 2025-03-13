@@ -73,6 +73,7 @@ const Home: React.FC = () => {
 
       // Clear input text
       setChatMessage("");
+      setCharCount(0);
 
       // Reset states
       setLoading(false);
@@ -463,6 +464,7 @@ const handleSubmit = async (event: React.FormEvent) => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       handleSubmit(event);
+      setCharCount(0);
     }
   };
 
