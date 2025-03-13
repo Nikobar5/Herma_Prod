@@ -39,7 +39,6 @@ const Home: React.FC = () => {
   const [isStreaming, setIsStreaming] = useState(false);
 
   const [autoScroll, setAutoScroll] = useState(true);
-  const [userHasScrolled, setUserHasScrolled] = useState(false);
   const messageDisplayRef = useRef<HTMLDivElement | null>(null);
   const messageEndRef = useRef<HTMLDivElement | null>(null);
   const [charCount, setCharCount] = useState(0);
@@ -79,7 +78,6 @@ const Home: React.FC = () => {
       setLoading(false);
       setIsStreaming(false);
       setAutoScroll(true);
-      setUserHasScrolled(false);
 
       // Clear messages
       setMessages([]);
@@ -109,8 +107,7 @@ const Home: React.FC = () => {
           const nearBottom = isNearBottom();
 
           // If user has scrolled away from bottom during streaming
-          if (!nearBottom && !userHasScrolled) {
-            setUserHasScrolled(true);
+          if (!nearBottom) {
             setAutoScroll(false);
           }
         }
@@ -120,7 +117,7 @@ const Home: React.FC = () => {
       return () => {
         messageDisplay.removeEventListener('scroll', handleScroll);
       };
-    }, [isStreaming, userHasScrolled]);
+    }, [isStreaming]);
 
     useEffect(() => {
       // When user sends a message, always scroll to bottom and reset scroll tracking
@@ -129,7 +126,6 @@ const Home: React.FC = () => {
   
       if (isNewUserMessage) {
         setAutoScroll(true);
-        setUserHasScrolled(false);
         scrollToBottom();
       } else if (autoScroll) {
         // For bot messages, only scroll if auto-scroll is still enabled
@@ -241,7 +237,6 @@ const handleChatInput = async (event: React.ChangeEvent<HTMLTextAreaElement>) =>
   // If this is the first chunk, set isStreaming to true
   if (!isStreaming) {
     setIsStreaming(true);
-    setUserHasScrolled(false);
     setAutoScroll(true);
   }
 
@@ -276,7 +271,7 @@ const handleChatInput = async (event: React.ChangeEvent<HTMLTextAreaElement>) =>
     return () => {
       ipcRenderer.removeListener('chat-response', messageHandler);
     };
-  }, [autoScroll, isStreaming, userHasScrolled]);
+  }, [autoScroll, isStreaming]);
 
 const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (loading || isStreaming) {
@@ -437,7 +432,6 @@ const handleSubmit = async (event: React.FormEvent) => {
   setIsStreaming(false); // Reset streaming state
   setChatMessage("");
   setHasStarted(true);
-  setUserHasScrolled(false);
   setAutoScroll(true);
 
   const textarea = document.querySelector('.chat-input') as HTMLTextAreaElement;
