@@ -147,19 +147,15 @@ const handleChatInput = async (event: React.ChangeEvent<HTMLTextAreaElement>) =>
     setChatMessage(newText);
   } else if (isProbablyPaste) {
     // If it's a paste operation and exceeds limit, extract only the pasted content
+    setCharCount(-1);
+    setIsUploading(true);
     // Calculate what was pasted by finding the difference between new and old text
     const pastedContent = newText.substring(chatMessage.length);
+    const blob = new Blob([pastedContent], { type: 'text/plain' });
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `paste_${timestamp}.txt`;
 
     try {
-      setIsUploading(true);
-
-      // Create a Blob from just the pasted content
-      const blob = new Blob([pastedContent], { type: 'text/plain' });
-
-      // Generate a unique filename with timestamp and random string
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const filename = `paste_${timestamp}.txt`;
-
       // Convert Blob to Buffer for Electron
       const arrayBuffer = await blob.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
@@ -189,6 +185,7 @@ const handleChatInput = async (event: React.ChangeEvent<HTMLTextAreaElement>) =>
       console.error("Error handling paste:", error);
     } finally {
       setIsUploading(false);
+      setCharCount(chatMessage.length);
     }
   } else {
     // For normal typing that exceeds the limit, just truncate
@@ -686,11 +683,15 @@ const handleSubmit = async (event: React.FormEvent) => {
         rows={1}
         style={{ height: 'auto' }}
       />
-      {charCount > 0 && (
-                <div className={`char-count ${charCount > MAX_CHARS * 0.9 ? 'char-count-warning' : 'char-count-normal'}`}>
-                  {charCount}/{MAX_CHARS}
-                </div>
-                )}
+      {charCount > 0 ? (
+        <div className={`char-count ${charCount > MAX_CHARS * 0.9 ? 'char-count-warning' : 'char-count-normal'}`}>
+          {charCount}/{MAX_CHARS}
+        </div>
+      ) : charCount === -1 ? (
+        <div className="char-count char-count-normal uploading-paste">
+          uploading paste...
+        </div>
+      ) : null}
     </div>
     <div className="chat-buttons-container">
               <label className={`upload-button ${(loading || isStreaming) ? 'disabled' : ''}`}
@@ -775,11 +776,15 @@ const handleSubmit = async (event: React.FormEvent) => {
                     rows={1}
                     style={{ height: 'auto' }}
                   />
-                {charCount > 0 && (
-                  <div className={`char-count ${charCount > MAX_CHARS * 0.9 ? 'char-count-warning' : 'char-count-normal'}`}>
-                    {charCount}/{MAX_CHARS}
-                  </div>
-                )}
+                  {charCount > 0 ? (
+                    <div className={`char-count ${charCount > MAX_CHARS * 0.9 ? 'char-count-warning' : 'char-count-normal'}`}>
+                      {charCount}/{MAX_CHARS}
+                    </div>
+                  ) : charCount === -1 ? (
+                    <div className="char-count char-count-normal uploading-paste">
+                      uploading paste...
+                    </div>
+                  ) : null}
               </div>
                     <label className={`upload-button ${(loading || isStreaming) ? 'disabled' : ''}`}
                            data-tooltip={`${(loading || isStreaming) ? 'Please wait until response completes' : 'Select files to upload'}`}>
