@@ -470,6 +470,7 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  scrollbar-color: transparent transparent;
 }
 
 .chat-header {
@@ -486,6 +487,7 @@ body {
   display: flex;
   align-items: center;
   flex: 1;
+  opacity: 1;
 }
 
 .logo-Center {
@@ -496,8 +498,10 @@ body {
 
 .center-title {
   font-size: var(--h1-size);
-  cursor: text;
-  /*font-family: 'Times New Roman', Times, serif;*/
+  cursor: default;
+  user-select: none;
+  font-weight: bold;
+  color: var(--text-color);
 }
 
 .loading {
@@ -633,7 +637,7 @@ body {
   align-self: center;
   text-align: center;
   color: var(--text-color);
-  opacity: 0.8;
+  opacity: 1;
 }
 
 .input-bar-buttons {
@@ -642,6 +646,7 @@ body {
   bottom: 3rem;
   width: 100%;
   max-width: 100%;
+  opacity: 1;
 }
 
 .chat-buttons-container {
@@ -665,7 +670,7 @@ body {
   overflow-y: auto; /* Add scrollbar when needed */
   line-height: 1.5; /* Improve text readability */
   padding: 0; /* Remove padding since container has padding */
-  margin: 0;
+  margin: 0;;
   width: 100%;
 }
 
@@ -741,6 +746,7 @@ body {
 /************* Character Counter ****************/
 .input-container {
   position: relative; /* Ensure absolute positioning works relative to this container */
+  opacity: 1 !important;
 }
 
 .char-count {
@@ -748,11 +754,13 @@ body {
   bottom: 8px;
   right: 15px;
   font-size: 0.7rem;
-  opacity: 0.7;
+  border-radius: 20%;
+  padding-top: 2px;
+  padding-left: 2px;
   user-select: none; /* Prevent selection of the counter text */
   pointer-events: none; /* Makes sure it doesn't interfere with clicking */
-  background: transparent;
-  z-index: 5; /* Ensures it appears above the textarea */
+  background: var(--secondary-bg);
+  z-index: 5000; /* Ensures it appears above the textarea */
 }
 
 .char-count-warning {
@@ -1023,7 +1031,9 @@ body {
   padding: 0.75rem 1rem;
   width: 100%;
   
-  z-index: 100;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  isolation: isolate;
 }
 
 /* Ensure complete opacity by adding a solid background */
@@ -1075,6 +1085,7 @@ body {
   width: 100%;
   position: relative;
   z-index: 2; /* Above the pseudo-element */
+  opacity: 1;
 }
 
 /* In case the input area becomes visible when typing a lot */

@@ -760,7 +760,7 @@ const handleSubmit = async (event: React.FormEvent) => {
           <div className="centered-start">
             <div className="chat-header">
               <img src="Herma.jpeg" alt="Logo-Center" className="logo-Center" />
-              <span className="center-title" contentEditable="true">HΞRMΛ</span>
+              <span className="center-title">HΞRMΛ</span>
             </div>
             {loading && <div className="loading">Loading...</div>}
             <form className="chat-form-centered" onSubmit={handleSubmit}>
