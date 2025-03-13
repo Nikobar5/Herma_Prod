@@ -134,6 +134,19 @@ const Home: React.FC = () => {
       }
     }, [messages, autoScroll]);
 
+    useEffect(() => {
+      // When selected files change, ensure input is enabled
+      const inputElement = document.querySelector('.chat-input') as HTMLTextAreaElement;
+      if (inputElement && !loading && !isStreaming) {
+        inputElement.disabled = false;
+        
+        // If in conversation mode, try to focus the input
+        if (hasStarted) {
+          inputElement.focus();
+        }
+      }
+    }, [selectedFiles, uploadedFiles]);
+
 const handleChatInput = async (event: React.ChangeEvent<HTMLTextAreaElement>) => {
   const textarea = event.target;
   const newText = event.target.value;
@@ -403,16 +416,43 @@ const handleInterrupt = async () => {
   };
 
   const handleDeleteFile = async (filename: string, e: React.MouseEvent) => {
+    // Completely prevent event bubbling
+    e.preventDefault();
     e.stopPropagation();
-
+    
     if (window.confirm(`Are you sure you want to delete ${filename}?`)) {
       try {
+        // First, remove the file from selectedFiles if it's there
+        const newSelectedFiles = selectedFiles.filter(f => f !== filename);
+        setSelectedFiles(newSelectedFiles);
+        
+        // Update the backend about the selection change
+        await ipcRenderer.invoke('select-files', { filenames: newSelectedFiles });
+        
+        // Then delete the file
         await ipcRenderer.invoke('delete-file', { filename });
-        await fetchAndSelectFiles();
+        
+        // Refresh the file list
+        const files = await ipcRenderer.invoke('get-files');
+        setUploadedFiles(files);
+        
+        // Force React to re-render by updating a state
+        setChatMessage(prev => prev + ""); // This is a hack to trigger re-render
+        
+        // Force the chat input to be enabled and focused after a short delay
+        setTimeout(() => {
+          const inputs = document.querySelectorAll('.chat-input') as NodeListOf<HTMLTextAreaElement>;
+          inputs.forEach(input => {
+            input.disabled = false;
+            input.focus();
+          });
+        }, 200);
+        
       } catch (error) {
         console.error("Error deleting file:", error);
       }
     }
+    resetInputState();
   };
 
   useEffect(() => {
@@ -496,6 +536,28 @@ const handleSubmit = async (event: React.FormEvent) => {
     isVisible: boolean;
     onClose: () => void;
   }
+
+  const resetInputState = () => {
+    // Reset all input-related states
+    setIsUploading(false);
+    
+    // Force-enable all chat inputs
+    const inputs = document.querySelectorAll('.chat-input') as NodeListOf<HTMLTextAreaElement>;
+    inputs.forEach(input => {
+      input.disabled = false;
+    });
+    
+    // Focus the appropriate input
+    setTimeout(() => {
+      const input = hasStarted 
+        ? document.querySelector('.chat-form .chat-input') 
+        : document.querySelector('.chat-form-centered .chat-input');
+      
+      if (input) {
+        (input as HTMLTextAreaElement).focus();
+      }
+    }, 100);
+  };
 
   const FileTypeAlert: React.FC<FileTypeAlertProps> = ({ isVisible, onClose }) => {
     if (!isVisible) return null;
@@ -679,9 +741,23 @@ const handleSubmit = async (event: React.FormEvent) => {
         onChange={handleChatInput}
         onKeyPress={handleKeyPress}
         className="chat-input"
-        disabled={loading || isUploading}
+        disabled={loading || (isUploading && !selectedFiles)}
         rows={1}
         style={{ height: 'auto' }}
+        onFocus={() => {
+          // Ensure the input is enabled when focused
+          const inputs = document.querySelectorAll('.chat-input') as NodeListOf<HTMLTextAreaElement>;
+          inputs.forEach(input => {
+            input.disabled = false;
+          });
+        }}
+        onClick={() => {
+          // Ensure the input is enabled when clicked
+          const inputs = document.querySelectorAll('.chat-input') as NodeListOf<HTMLTextAreaElement>;
+          inputs.forEach(input => {
+            input.disabled = false; 
+          });
+        }}
       />
       {charCount > 0 ? (
         <div className={`char-count ${charCount > MAX_CHARS * 0.9 ? 'char-count-warning' : 'char-count-normal'}`}>
