@@ -359,11 +359,11 @@ class Uploaded_data:
         if not chunks:
             return "No content available for summarization."
 
-        # If we have fewer than 4 chunks, use all available chunks
+        # If we have fewer than 6 chunks, use all available chunks
         sample_chunks = []
-        is_full_document = len(chunks) < 4
+        is_full_document = len(chunks) < 6
         if not is_full_document:
-            sample_chunks = chunks[:2] + chunks[-2:]
+            sample_chunks = chunks[:3] + chunks[-3:]
         else:
             sample_chunks = chunks
 

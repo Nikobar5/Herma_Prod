@@ -1,6 +1,8 @@
 from langchain_ollama import ChatOllama
-from langchain_community.chat_message_histories import ChatMessageHistory
-from langchain_core.runnables.history import RunnableWithMessageHistory
+# Remove ChatMessageHistory import since we don't need it anymore
+# from langchain_community.chat_message_histories import ChatMessageHistory
+# Remove RunnableWithMessageHistory as we're handling history differently
+# from langchain_core.runnables.history import RunnableWithMessageHistory
 
 from prompt_maker import make_prompt
 from langchain.globals import set_debug
@@ -12,18 +14,14 @@ import os
 import time
 from pathlib import Path
 from count_tokens import estimate_tokens
-
-# Session class represents a chat session, session_id can be used for ordering/organizing chat history,
-# session.summary can be used to easily retrieve and redisplay chat history, and session_summary can give it a name
-# later updates can include metadata like time if possible along with where cutoffs for context ended and other metrics
-# to more effectively sort sessions and provide expedited responses
-# also makes it easier to manage all storage in one centralized area instead of within the class
+import re
 
 
 class Session:
     def __init__(self, currently_used_data):
         set_debug(True)
         self.session_summary = ""
+        # Initialize session_history as an empty string
         self.session_history = ""
         self.num_exchanges = 0
         # List of uploaded_data that is being used
@@ -65,16 +63,18 @@ class Session:
         except Exception as e:
             print(f"DEBUG: Error cleaning up chat history storage during initialization: {e}")
 
-    # Retrieves chat history from whatever session you are in or creates a new session chat history
-    def get_chat_history(self):
-        if self.session_history == "":
-            self.session_history = ChatMessageHistory()
-        return self.session_history
+    # Add user message to history
+    def add_user_message(self, message):
+        self.session_history += f"<|start_header_id|>user<|end_header_id|>\n\n{message}<|eot_id|>"
 
-    # Takes user input and prints response, langchain handles conversation history
+    # Add assistant message to history
+    def add_assistant_message(self, message):
+        self.session_history += f"<|start_header_id|>assistant<|end_header_id|>\n{message}<|eot_id|>"
+
+    # Takes user input and prints response, using Llama format
     def ask(self, input):
         """
-        Takes user input and streams response, langchain handles conversation history
+        Takes user input and streams response using Llama prompt format
         """
         self._cancel_generation = False
         # Instantiates the llm to be used, setting the model and context window, other params can also be adjusted
@@ -136,6 +136,7 @@ class Session:
                 markdown_table += f"| {filename} | {page} | {section} |\n"
 
             formatted_sources = markdown_table
+
         chat_history_context = ""
         if self.ltm_session_history is not None:
             chat_history_context = "This conversation has been going on for a while, here is some relevant context from " \
@@ -155,13 +156,13 @@ class Session:
             else:
                 chat_history_context += "No relevant earlier context found."
 
-        prompt = make_prompt(chat_history_context, doc_context, self.currently_used_data)
-        chain = prompt | llm
-        chain_with_message_history = RunnableWithMessageHistory(
-            chain,
-            self.get_chat_history,
-            input_messages_key="input",
-            history_messages_key="chat_history",
+        # Get the prompt template
+        prompt_template = make_prompt(chat_history_context, doc_context, self.currently_used_data)
+
+        # Complete the prompt by filling in the template
+        complete_prompt = prompt_template.format(
+            chat_history=self.session_history,
+            input=input
         )
 
         # Stream the model's response
@@ -170,41 +171,41 @@ class Session:
         was_interrupted = False  # Flag to track if interruption happened
 
         try:
-            for chunk in chain_with_message_history.stream({"input": input}):
+            # Send the complete prompt to the model
+            for chunk in llm.stream(complete_prompt):
                 if self._cancel_generation:
                     was_interrupted = True
                     break  # Exit the loop but continue to our handler below
 
+                # Clean up any response formatting tokens that might be included
+                chunk_content = chunk.content
+                # Remove any potential leading Llama tokens that might be included in the response
+                chunk_content = re.sub(r'^<\|start_header_id\|>assistant<\|end_header_id\|>\s*', '', chunk_content)
+                chunk_content = re.sub(r'<\|eot_id\|>$', '', chunk_content)
+
                 content_yielded = True
-                accumulated_response += chunk.content  # Build up the full response
-                yield chunk.content
+                accumulated_response += chunk_content  # Build up the full response
+                yield chunk_content
 
-            # After streaming finishes (or is interrupted), check if we need to handle manually
-            if was_interrupted and content_yielded:
-                # Get the current messages to check if our user message is already there
-                current_messages = self.get_chat_history().messages
+            # After streaming finishes (or is interrupted), update the chat history
+            if content_yielded:
+                # Add the user message to history
+                self.add_user_message(input)
 
-                # Check if the user message is already in history
-                user_message_exists = False
-                for msg in reversed(current_messages):
-                    if msg.type == "human" and msg.content == input:
-                        user_message_exists = True
-                        break
+                # Add the AI response to history
+                if was_interrupted:
+                    ai_response = accumulated_response + " [User interrupted response]"
+                else:
+                    ai_response = accumulated_response
 
-                # Add the user message only if needed
-                if not user_message_exists:
-                    self.get_chat_history().add_user_message(input)
+                self.add_assistant_message(ai_response)
 
-                # Add the interrupted AI response with the notice
-                interrupted_response = accumulated_response + " [User interrupted response]"
-                self.get_chat_history().add_ai_message(interrupted_response)
         except Exception as e:
             print(f"Error during streaming: {e}")
             if content_yielded:
                 # Handle interruptions caused by errors
-                self.get_chat_history().add_user_message(input)
-                self.get_chat_history().add_ai_message(accumulated_response + " [User intentionally interrupted "
-                                                                              "response here]")
+                self.add_user_message(input)
+                self.add_assistant_message(accumulated_response + " [Response interrupted due to error]")
 
         # Sources handling for normal completion
         if not was_interrupted and formatted_sources is not None and content_yielded:
@@ -213,59 +214,56 @@ class Session:
         self.num_exchanges += 1
         self.trim_chat_history()
 
-
     def cancel_generation(self):
         """Called to stop ongoing generation"""
         self._cancel_generation = True
         print("Generation cancellation requested")
 
-        # Reset the session history state to be ready for new interactions
-        # This is important so new requests don't wait for the old Ollama process
-        if self.session_history != "":
-            # Keep the history but mark that we're ready for new interactions
-            # We don't actually delete the history as that would lose context
-            # The electron side will have already killed Ollama
-            pass  # Ollama is being killed externally
-
     # Assigns a short summary to a session
     def assign_session_summary(self):
         llm = ChatOllama(model="llama3.2:1b")
-        self.session_summary = llm.invoke(
-            "Output a sub 5 word short summary blurb of what the topic of this conversation is:"
-            + "\n" + str(self.session_history) + "\n" + "make sure the output is under 6 words").content
+
+        # Create a Llama-formatted prompt for summary generation
+        summary_prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+
+        Output a sub 5 word short summary blurb of what the topic of this conversation is.<|eot_id|><|start_header_id|>user<|end_header_id|>
+
+        Conversation to summarize:
+        {self.get_history_as_string()}<|eot_id|>"""
+
+        response = llm.invoke(summary_prompt)
+
+        # Clean the response of any potential Llama formatting tokens
+        cleaned_response = re.sub(r'^<\|start_header_id\|>assistant<\|end_header_id\|>\s*', '', response.content)
+        cleaned_response = re.sub(r'<\|eot_id\|>$', '', cleaned_response)
+
+        self.session_summary = cleaned_response.strip()
         print(self.session_summary)
 
     def get_history_as_string(self):
-        messages = self.session_history.messages
-        history_string = ""
+        """
+        Convert the formatted history to a plain string format for display or processing
+        """
+        # Define a pattern to match user and assistant messages
+        pattern = r'<\|start_header_id\|>(user|assistant)<\|end_header_id\|>\s*(.*?)<\|eot_id\|>'
 
-        for message in messages:
-            if hasattr(message, "type"):
-                prefix = "User: " if message.type == "human" else "Assistant: "
-                history_string += f"{prefix}{message.content}\n"
+        # Find all matches in the session history
+        matches = re.findall(pattern, self.session_history, re.DOTALL)
+
+        # Build a readable string
+        history_string = ""
+        for role, content in matches:
+            prefix = "User: " if role == "user" else "Assistant: "
+            history_string += f"{prefix}{content.strip()}\n"
 
         return history_string
 
     def trim_chat_history(self):
         """
-        Trims the chat history if it exceeds x characters.
-        Keeps the most recent messages and trims from the beginning,
-        working backwards until the x character limit is reached,
-        then finding the next human message to create a clean cut.
-
-        Special case: If the most recent message is over x characters,
-        it keeps that message and the human message that prompted it,
-        and clips all previous messages.
+        Trims the chat history if it exceeds character limit.
+        For the string-based history, we need to find and remove complete message blocks.
         """
-
-        # Get all messages
-        messages = self.session_history.messages
-
-        # If no messages, nothing to trim
-        if not messages:
-            return
-
-        # Convert to string to check total length
+        # Get readable history to check length
         history_string = self.get_history_as_string()
         total_length = len(history_string)
 
@@ -274,171 +272,66 @@ class Session:
 
         # If under the limit, no need to trim
         if total_length <= 4000:
-            print(f"DEBUG: History under x char limit, no trimming needed.")
+            print(f"DEBUG: History under character limit, no trimming needed.")
             return
 
-        # Check for special case: most recent message exceeds x characters
-        # In this case, keep only the most recent exchange (human + assistant)
-        if len(messages) >= 2:
-            last_message = messages[-1]
-            second_last_message = messages[-2]
+        # Find all message blocks in the history
+        pattern = r'(<\|start_header_id\|>(user|assistant)<\|end_header_id\|>.*?<\|eot_id\|>)'
+        message_blocks = re.findall(pattern, self.session_history, re.DOTALL)
 
-            # Check if the last message is from assistant and second last is from human
-            if last_message.type == "assistant" and second_last_message.type == "human":
-                # Calculate the length of just this exchange
-                prefix_assistant = "Assistant: "
-                prefix_human = "User: "
-                last_exchange_length = len(prefix_assistant + last_message.content + "\n") + \
-                                       len(prefix_human + second_last_message.content + "\n")
+        if not message_blocks:
+            print(f"DEBUG: No message blocks found for trimming.")
+            return
 
-                # If this one exchange is already over x characters or close to it
-                if last_exchange_length > 4000:
-                    print(f"DEBUG: Special case - most recent exchange is {last_exchange_length} chars")
-
-                    # Keep only the most recent exchange
-                    messages_to_keep = [second_last_message, last_message]
-                    messages_to_clip = messages[:-2]  # All messages except the last two
-
-                    # Extract the clipped messages into a string for storing
-                    clipped_history = ""
-                    for message in messages_to_clip:
-                        prefix = "User: " if message.type == "human" else "Assistant: "
-                        clipped_history += f"{prefix}{message.content}\n"
-
-                    # Create a new ChatMessageHistory with only the messages we want to keep
-                    new_history = ChatMessageHistory()
-
-                    # Add the kept messages to the new history
-                    for message in messages_to_keep:
-                        if message.type == "human":
-                            new_history.add_user_message(message.content)
-                        else:
-                            new_history.add_ai_message(message.content)
-
-                    # Replace the old history with the new one
-                    self.session_history = new_history
-
-                    # Handle the clipped history (same as regular case)
-                    if clipped_history:
-                        # Create the storage directory if it doesn't exist
-                        project_root = Path(__file__).resolve().parents[2]
-                        storage_dir = project_root / 'storage' / 'chat_history_storage'
-                        os.makedirs(storage_dir, exist_ok=True)
-
-                        # Get existing history content if available
-                        existing_content = ""
-                        if self.ltm_session_history is not None and hasattr(self.ltm_session_history, 'data_path'):
-                            try:
-                                with open(self.ltm_session_history.data_path, 'r', encoding='utf-8') as f:
-                                    existing_content = f.read()
-                            except (FileNotFoundError, AttributeError):
-                                print(f"DEBUG: Could not read previous history file")
-                                pass
-
-                        # Clean up old files after retrieving their content
-                        try:
-                            # Find all chat history files in the directory
-                            old_files = glob.glob(str(storage_dir / "chat_history_*.txt"))
-
-                            for old_file in old_files:
-                                # Extract the base filename without extension
-                                base_name = os.path.basename(old_file)
-
-                                # Delete the file
-                                os.remove(old_file)
-                                print(f"DEBUG: Deleted old history file: {old_file}")
-
-                                # Delete associated vector DB
-                                Uploaded_data.delete_vector_db(base_name)
-                                print(f"DEBUG: Deleted vector DB for: {base_name}")
-                        except Exception as e:
-                            print(f"DEBUG: Error cleaning up old history files: {e}")
-
-                        # Create a filename using timestamp
-                        timestamp = int(time.time() * 1000)  # millisecond precision
-                        history_filename = f"chat_history_{timestamp}.txt"
-                        history_filepath = storage_dir / history_filename
-
-                        # Write combined history to the new file
-                        with open(history_filepath, 'w', encoding='utf-8') as f:
-                            f.write(existing_content + clipped_history)
-
-                        # Debug print
-                        print(
-                            f"DEBUG: Wrote {len(existing_content) + len(clipped_history)} chars to {history_filename}")
-
-                        # Create or update the Uploaded_data object with the path to this file
-                        self.ltm_session_history = Uploaded_data(history_filename, str(history_filepath), True, 200)
-
-                    print(
-                        f"Special case: Chat history trimmed to just the most recent exchange. {len(messages_to_clip)} messages clipped.")
-                    return  # Exit early since we've handled the special case
-
-        # Regular case: Start from the most recent message and work backwards
-        # to find which messages to keep under the x character limit
-        messages_to_keep = []
+        # Keep track of blocks to keep and blocks to remove
+        blocks_to_keep = []
         current_length = 0
 
-        # Process messages from newest (end) to oldest (beginning)
-        for message in reversed(messages):
-            # Calculate the length of this message (with prefix)
-            prefix = "User: " if message.type == "human" else "Assistant: "
-            message_text = f"{prefix}{message.content}\n"
-            message_length = len(message_text)
+        # Process from newest (end) to oldest (beginning)
+        for block_tuple in reversed(message_blocks):
+            block = block_tuple[0]  # Get the full message block
 
-            # If adding this message would exceed the limit, stop here
-            if current_length + message_length > 4000:
-                break
+            # Extract the content to estimate its plain text length
+            content_match = re.search(r'<\|end_header_id\|>\s*(.*?)<\|eot_id\|>', block, re.DOTALL)
+            if content_match:
+                content = content_match.group(1)
+                role = "User: " if "user" in block else "Assistant: "
+                plain_length = len(f"{role}{content.strip()}\n")
 
-            # This message fits, so keep it
-            messages_to_keep.insert(0, message)  # Insert at beginning to restore original order
-            current_length += message_length
+                # If adding this block would exceed the limit, stop here
+                if current_length + plain_length > 4000:
+                    break
 
-        # If we're keeping all messages, no need to trim
-        if len(messages_to_keep) == len(messages):
+                # This block fits, so keep it
+                blocks_to_keep.insert(0, block)  # Insert at beginning to restore original order
+                current_length += plain_length
+
+        # If we're keeping all blocks, no need to trim
+        if len(blocks_to_keep) == len(message_blocks):
             print(f"DEBUG: Calculated to keep all messages, something unexpected happened.")
             return
 
-        # Find the index where we should make the cut
-        cutoff_index = 0
-        if messages_to_keep:
-            # Find the index of the first message we want to keep
-            first_keep_message = messages_to_keep[0]
-            for i, msg in enumerate(messages):
-                if msg is first_keep_message:
-                    cutoff_index = i
-                    break
+        # Join the blocks to keep into a new history string
+        new_history = "".join(blocks_to_keep)
 
-        # Make sure we cut at a User message for clean context
-        for i in range(cutoff_index, 0, -1):
-            if messages[i].type == "human":
-                # Found a user message, cut here
-                cutoff_index = i
-                break
+        # Extract the clipped blocks into a string for storing
+        removed_blocks = []
+        for block_tuple in message_blocks:
+            block = block_tuple[0]
+            if block not in blocks_to_keep:
+                removed_blocks.append(block)
 
-        # Everything before the cutoff index will be clipped
-        messages_to_clip = messages[:cutoff_index]
-        messages_to_keep = messages[cutoff_index:]
+        clipped_history = ""
+        for block in removed_blocks:
+            content_match = re.search(r'<\|end_header_id\|>\s*(.*?)<\|eot_id\|>', block, re.DOTALL)
+            if content_match:
+                content = content_match.group(1)
+                role = "User: " if "user" in block else "Assistant: "
+                clipped_history += f"{role}{content.strip()}\n"
 
         # Debug print
-        print(f"DEBUG: Keeping {len(messages_to_keep)} most recent messages ({current_length} chars)")
-        print(f"DEBUG: Clipping {len(messages_to_clip)} messages")
-
-        # Extract the clipped messages into a string for storing
-        clipped_history = ""
-        for message in messages_to_clip:
-            prefix = "User: " if message.type == "human" else "Assistant: "
-            clipped_history += f"{prefix}{message.content}\n"
-
-        # Create a new ChatMessageHistory with only the messages we want to keep
-        new_history = ChatMessageHistory()
-
-        # Add the kept messages to the new history in the correct order
-        for message in messages_to_keep:
-            if message.type == "human":
-                new_history.add_user_message(message.content)
-            else:
-                new_history.add_ai_message(message.content)
+        print(f"DEBUG: Keeping {len(blocks_to_keep)} most recent messages ({current_length} chars)")
+        print(f"DEBUG: Clipping {len(removed_blocks)} messages")
 
         # Replace the old history with the new one
         self.session_history = new_history
@@ -495,4 +388,4 @@ class Session:
             # Create or update the Uploaded_data object with the path to this file
             self.ltm_session_history = Uploaded_data(history_filename, str(history_filepath), False, 200)
 
-        print(f"Chat history trimmed: {len(messages_to_clip)} messages clipped, {len(messages_to_keep)} messages kept")
+        print(f"Chat history trimmed: {len(removed_blocks)} messages clipped, {len(blocks_to_keep)} messages kept")
