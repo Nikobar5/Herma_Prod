@@ -669,7 +669,7 @@ body {
   resize: none; /* Prevent manual resizing */
   overflow-y: auto; /* Add scrollbar when needed */
   line-height: 1.5; /* Improve text readability */
-  padding: 0; /* Remove padding since container has padding */
+  padding: 0.2; /* Remove padding since container has padding */
   margin: 0;;
   width: 100%;
 }

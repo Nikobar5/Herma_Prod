@@ -31,7 +31,7 @@ def make_prompt(chat_history_context, context, currently_used_data):
         safe_doc_names = [name.replace('{', '{{').replace('}', '}}') for name in doc_names]
         doc_names_str = ", ".join(safe_doc_names)
 
-        context_addition = f"""You are currently given context from {num_docs} {'document' if num_docs == 1 else 'documents'} to utilize. 
+        context_addition = f"""You are currently given context from {num_docs} {'document' if num_docs == 1 else 'documents'} which I want you to use for this response. 
         Their {'name is' if num_docs == 1 else 'names are'}: {doc_names_str}.
 
         Document Summaries:
@@ -43,7 +43,7 @@ def make_prompt(chat_history_context, context, currently_used_data):
 
         # Add in later when able to create more functional searchable chat history
         # {safe_chat_history_context}"""
-        system_content += " based on the provided context. " + context_addition
+        system_content
 
 
     # Create the Llama 3.1+ formatted prompt template
@@ -52,7 +52,7 @@ def make_prompt(chat_history_context, context, currently_used_data):
 
     {system_content}<|eot_id|>{{chat_history}}<|start_header_id|>user<|end_header_id|>
 
-    {{input}}<|eot_id|>"""
+    {context_addition if context else ""}{{input}}<|eot_id|><|start_header_id|>assistant<|end_header_id|>"""
 
     # Return the formatted template that can be used with string formatting
     return template

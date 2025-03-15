@@ -497,13 +497,19 @@ const handleSubmit = async (event: React.FormEvent) => {
   }
 };
 
-  const handleKeyPress = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === 'Enter' && !event.shiftKey) {
+const handleKeyPress = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  if (event.key === 'Enter' && !event.shiftKey) {
+    // Prevent form submission if uploading is in progress
+    if (isUploading) {
       event.preventDefault();
-      handleSubmit(event);
-      setCharCount(0);
+      return; // Don't proceed with submission
     }
-  };
+
+    event.preventDefault();
+    handleSubmit(event);
+    setCharCount(0);
+  }
+};
 
   const LoadingDots = () => (
     <div className="loading-dots">
