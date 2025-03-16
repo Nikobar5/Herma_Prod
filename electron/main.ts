@@ -451,27 +451,160 @@ ipcMain.handle('interrupt-chat', async () => {
   });
 }
 
+// Update your createWindow function with these changes
 async function createWindow() {
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
     webPreferences: {
       nodeIntegration: true,
-      contextIsolation: false
+      contextIsolation: false,
+      preload: path.join(__dirname, 'preload.js')
     }
   });
 
-  console.log('NODE_ENV:', process.env.NODE_ENV);
+  // Add event listener for webContents errors
+  win.webContents.on('did-fail-load', (
+    _event: Electron.Event,
+    errorCode: number,
+    errorDescription: string
+  ) => {
+    console.error(`Page failed to load: ${errorDescription} (${errorCode})`);
+  });
 
-  try {
-    console.log('Attempting to load Vite dev server...');
-    await win.loadURL('http://localhost:5173');
-    win.webContents.openDevTools();
-  } catch (err) {
-    console.error('Failed to load Vite dev server:', err);
-    console.log('Attempting to load file...');
-    win.loadFile(path.join(__dirname, '../../frontend/dist/index.html'));
+  // For the 'crashed' event
+  win.webContents.on('crashed', (
+    _event: Electron.Event
+  ) => {
+    console.error('Renderer process crashed');
+  });
+
+  // Add listener for console messages from renderer
+win.webContents.on('console-message', (
+  _event: Electron.Event,
+  level: number,
+  message: string,
+  _line: number,
+  _sourceId: string
+) => {
+  const levels = ['debug', 'info', 'warning', 'error'];
+  console.log(`[Renderer ${levels[level] || level}]: ${message}`);
+});
+
+  console.log('NODE_ENV:', process.env.NODE_ENV);
+  console.log('Current directory:', __dirname);
+
+  const isDev = process.env.NODE_ENV === 'development';
+
+  if (isDev) {
+    try {
+      console.log('Running in development mode, loading from Vite server...');
+      await win.loadURL('http://localhost:5173');
+    } catch (err) {
+      console.error('Failed to load Vite dev server:', err);
+      try {
+        console.log('Attempting to load built file as fallback...');
+        await win.loadFile(path.join(__dirname, '../frontend/dist/index.html'));
+      } catch (loadErr) {
+        console.error('Failed to load built file:', loadErr);
+      }
+    }
+  } else {
+    try {
+      console.log('Running in production mode, loading diagnostic page...');
+
+      // First, try to load the diagnostic page
+      const debugPath = path.join(__dirname, '../../frontend/dist/debug.html');
+
+      try {
+        await fs.access(debugPath);
+        console.log('Found debug.html at:', debugPath);
+
+        await win.loadFile(debugPath);
+        console.log('Successfully loaded diagnostic page');
+
+        // Don't continue to the original loading code - let user test and click "Load App" button
+        // to load the actual app if the diagnostic page works
+      } catch (debugErr) {
+        console.error('Diagnostic page not found, falling back to normal loading:', debugErr);
+
+        // Continue with your original path-finding approach
+        const possiblePaths = [
+          path.join(__dirname, '../frontend/dist/index.html'),
+          path.join(__dirname, '../../frontend/dist/index.html'),
+          path.join(process.cwd(), 'frontend/dist/index.html'),
+          path.join(app.getAppPath(), 'frontend/dist/index.html')
+        ];
+
+        let indexPath = null;
+        let foundPath = false;
+
+        // Try each path until we find one that exists
+        for (const testPath of possiblePaths) {
+          try {
+            await fs.access(testPath);
+            console.log('Found index.html at:', testPath);
+            indexPath = testPath;
+            foundPath = true;
+            break;
+          } catch (accessErr) {
+            console.error('index.html not found at:', testPath);
+          }
+        }
+
+        if (!foundPath) {
+          // As a last resort, try to list directories to help debug
+          console.error('Could not find index.html in any expected location');
+          try {
+            const appDir = app.getAppPath();
+            console.log('App directory:', appDir);
+
+            // List files in the app directory
+            const files = await fs.readdir(appDir);
+            console.log('Files in app directory:', files);
+
+            // Check if frontend exists
+            if (files.includes('frontend')) {
+              const frontendFiles = await fs.readdir(path.join(appDir, 'frontend'));
+              console.log('Files in frontend directory:', frontendFiles);
+
+              // Check if dist exists
+              if (frontendFiles.includes('dist')) {
+                const distFiles = await fs.readdir(path.join(appDir, 'frontend', 'dist'));
+                console.log('Files in dist directory:', distFiles);
+              }
+            }
+          } catch (listErr) {
+            console.error('Error listing directory contents:', listErr);
+          }
+
+          throw new Error('Could not find index.html in any expected location');
+        }
+
+        // Load the file
+        console.log('About to load file:', indexPath);
+        await win.loadFile(indexPath);
+        console.log('Successfully loaded index.html');
+      }
+    } catch (err) {
+      console.error('Failed to load built file:', err);
+
+      // Show error in window instead of blank screen
+      win.webContents.loadURL(`data:text/html;charset=utf-8,
+        <html>
+          <head><title>Error Loading App</title></head>
+          <body>
+            <h2>Error Loading Application</h2>
+            <pre style="background:#f0f0f0;padding:10px;border-radius:5px;overflow:auto;">${err}</pre>
+            <p>Check the console logs for more details (Ctrl+Shift+I).</p>
+          </body>
+        </html>
+      `);
+    }
   }
+
+  // Always open DevTools for debugging
+  win.webContents.openDevTools();
 }
 
 app.whenReady().then(async () => {

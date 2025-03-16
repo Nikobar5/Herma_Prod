@@ -12,7 +12,7 @@
     "install-all": "npm install && python3 -m pip install -r python/requirements.txt",
     "lint": "eslint .",
     "clean": "rimraf electron/dist frontend/dist",
-    "test:built": "electron electron/dist/main.js"
+    "test:built": "cross-env NODE_ENV=production electron electron/dist/main.js"
   },
   "dependencies": {
     "@types/marked": "^6.0.0",

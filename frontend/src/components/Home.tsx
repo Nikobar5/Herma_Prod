@@ -1,6 +1,14 @@
 // Home.tsx
 import React, { useState, useRef, useEffect } from "react";
-const { ipcRenderer } = window.require('electron');
+let ipcRenderer: any = null;
+try {
+  if (window.require) {
+    const electron = window.require('electron');
+    ipcRenderer = electron.ipcRenderer;
+  }
+} catch (error) {
+  console.error('Error accessing Electron API:', error);
+}
 import {marked} from 'marked';
 
 marked.setOptions({
