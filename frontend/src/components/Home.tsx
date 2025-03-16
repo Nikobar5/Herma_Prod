@@ -55,22 +55,20 @@ const Home: React.FC = () => {
   const isNearBottom = () => {
     if (messageDisplayRef.current) {
       const { scrollTop, scrollHeight, clientHeight } = messageDisplayRef.current;
-      // Consider "near bottom" if within 50px of the bottom
+
       return scrollHeight - scrollTop - clientHeight < 50;
     }
     return true;
   };
 
-  // Function to scroll to bottom
   const scrollToBottom = () => {
     if (messageEndRef.current && autoScroll) {
       messageEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   };
 
-      // First, add a new function to reset everything
     const handleNewChat = async () => {
-      // Interrupt any ongoing response first
+
       if (loading || isStreaming) {
         try {
           await ipcRenderer.invoke('interrupt-chat');
@@ -79,43 +77,37 @@ const Home: React.FC = () => {
         }
       }
 
-      // Clear input text
       setChatMessage("");
       setCharCount(0);
 
-      // Reset states
       setLoading(false);
       setIsStreaming(false);
       setAutoScroll(true);
 
-      // Clear messages
       setMessages([]);
 
-      // Reset hasStarted state
       setHasStarted(false);
 
-      // Clear selected files
       setSelectedFiles([]);
 
       try {
-        // Tell the backend to reset the session
+
         await ipcRenderer.invoke('new-session');
       } catch (error) {
         console.error("Error creating new session:", error);
       }
     };
 
-    // Set up scroll event listener to detect manual scrolling
     useEffect(() => {
       const messageDisplay = messageDisplayRef.current;
       if (!messageDisplay) return;
 
       const handleScroll = () => {
-        // Only consider this a manual scroll if we're streaming and not already at bottom
+
         if (isStreaming) {
           const nearBottom = isNearBottom();
 
-          // If user has scrolled away from bottom during streaming
+
           if (!nearBottom) {
             setAutoScroll(false);
           }
@@ -129,7 +121,7 @@ const Home: React.FC = () => {
     }, [isStreaming]);
 
     useEffect(() => {
-      // When user sends a message, always scroll to bottom and reset scroll tracking
+
       const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
       const isNewUserMessage = lastMessage && lastMessage.isUser;
   
@@ -137,18 +129,17 @@ const Home: React.FC = () => {
         setAutoScroll(true);
         scrollToBottom();
       } else if (autoScroll) {
-        // For bot messages, only scroll if auto-scroll is still enabled
+
         scrollToBottom();
       }
     }, [messages, autoScroll]);
 
     useEffect(() => {
-      // When selected files change, ensure input is enabled
+
       const inputElement = document.querySelector('.chat-input') as HTMLTextAreaElement;
       if (inputElement && !loading && !isStreaming) {
         inputElement.disabled = false;
-        
-        // If in conversation mode, try to focus the input
+
         if (hasStarted) {
           inputElement.focus();
         }
@@ -160,48 +151,41 @@ const handleChatInput = async (event: React.ChangeEvent<HTMLTextAreaElement>) =>
   const newText = event.target.value;
 
   setCharCount(newText.length);
-  // Check if this is likely a paste operation (sudden large text increase)
+
   const isProbablyPaste = chatMessage.length + 10 < newText.length && newText.length > MAX_CHARS;
 
-  // If the text is within the character limit or not a paste, update normally
   if (newText.length <= MAX_CHARS && !isProbablyPaste) {
     setChatMessage(newText);
   } else if (isProbablyPaste) {
-    // If it's a paste operation and exceeds limit, extract only the pasted content
+
     setCharCount(-1);
     setIsUploading(true);
-    // Calculate what was pasted by finding the difference between new and old text
+
     const pastedContent = newText.substring(chatMessage.length);
     const blob = new Blob([pastedContent], { type: 'text/plain' });
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const filename = `paste_${timestamp}.txt`;
 
     try {
-      // Convert Blob to Buffer for Electron
+
       const arrayBuffer = await blob.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
 
-      // Upload the file using the existing ipcRenderer method
       await ipcRenderer.invoke('upload-file', {
         filename,
         data: buffer
       });
 
-      // Add to the list of uploaded files
       setUploadedFiles(prev => [...prev, filename]);
       setSelectedFiles(prev => [...prev, filename]);
 
-      // Select the file
       await ipcRenderer.invoke('select-files', {
         filenames: [...selectedFiles, filename]
       });
 
-      // Update the files list
       const files = await ipcRenderer.invoke('get-files');
       setUploadedFiles(files);
 
-      // Keep the chat input as it was before the paste
-      // This effectively ignores the paste operation
     } catch (error) {
       console.error("Error handling paste:", error);
     } finally {
@@ -209,36 +193,33 @@ const handleChatInput = async (event: React.ChangeEvent<HTMLTextAreaElement>) =>
       setCharCount(chatMessage.length);
     }
   } else {
-    // For normal typing that exceeds the limit, just truncate
+
     setChatMessage(newText.substring(0, MAX_CHARS));
   }
 
-  // Reset height to auto to get the correct scrollHeight
   textarea.style.height = 'auto';
-  // Calculate new height while respecting min/max constraints
-  const newHeight = Math.min(Math.max(textarea.scrollHeight, 24), 208); // 24px min, 208px max
-  // Set the height to match the content
+
+  const newHeight = Math.min(Math.max(textarea.scrollHeight, 24), 208);
+
   textarea.style.height = `${newHeight}px`;
 };
 
   const handleSidebarToggle = () => {
-    // Toggle the sidebar state
+
     setIsSidebarOpen(!isSidebarOpen);
 
-    // When toggling to open on small screens, we need to ensure the container class is updated
     const sidebarContainer = document.querySelector('.sidebar-container');
     if (sidebarContainer) {
       if (!isSidebarOpen) {
-        // Opening the sidebar
+
         sidebarContainer.classList.remove('closed');
       } else {
-        // Closing the sidebar
+
         sidebarContainer.classList.add('closed');
       }
     }
   };
 
-  // Handle image upload
   const isImage = (filename: string) => {
     return /\.(jpg|jpeg|png|gif)$/i.test(filename);
   };
@@ -253,7 +234,6 @@ const handleChatInput = async (event: React.ChangeEvent<HTMLTextAreaElement>) =>
     return;
   }
 
-  // If this is the first chunk, set isStreaming to true
   if (!isStreaming) {
     setIsStreaming(true);
     setAutoScroll(true);
@@ -307,22 +287,20 @@ const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
   const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
   if (!validTypes.includes(fileExtension)) {
     setShowAlert(true);
-    event.target.value = ''; // Clear the file input
+    event.target.value = '';
     return;
   }
 
-  // Check if file already exists
   if (uploadedFiles.includes(file.name)) {
     const confirmReplace = window.confirm(
       `File "${file.name}" already exists. Would you like to replace it?`
     );
 
     if (!confirmReplace) {
-      event.target.value = ''; // Clear the file input
+      event.target.value = '';
       return;
     }
 
-    // If user confirms replacement, proceed with delete + upload flow
     try {
       // First delete the existing file
       await ipcRenderer.invoke('delete-file', {
@@ -330,7 +308,7 @@ const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
       });
     } catch (error) {
       console.error("Error deleting existing file:", error);
-      event.target.value = ''; // Clear the file input
+      event.target.value = '';
       return;
     }
   }
@@ -358,12 +336,11 @@ const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     console.error("Error uploading file:", error);
   } finally {
     setIsUploading(false);
-    event.target.value = ''; // Clear the file input
+    event.target.value = '';
   }
 };
 
 const handleInterrupt = async () => {
-  // If we haven't started streaming yet, add a cancelled message
   if (loading && !isStreaming) {
     setMessages(prevMessages => [
       ...prevMessages,
@@ -375,14 +352,12 @@ const handleInterrupt = async () => {
     ]);
   }
 
-  // Signal to backend to stop processing
   try {
     await ipcRenderer.invoke('interrupt-chat');
   } catch (error) {
     console.error("Error interrupting chat:", error);
   }
 
-  // Reset states
   setLoading(false);
   setIsStreaming(false);
 };
@@ -424,30 +399,25 @@ const handleInterrupt = async () => {
   };
 
   const handleDeleteFile = async (filename: string, e: React.MouseEvent) => {
-    // Completely prevent event bubbling
+
     e.preventDefault();
     e.stopPropagation();
     
     if (window.confirm(`Are you sure you want to delete ${filename}?`)) {
       try {
-        // First, remove the file from selectedFiles if it's there
+
         const newSelectedFiles = selectedFiles.filter(f => f !== filename);
         setSelectedFiles(newSelectedFiles);
-        
-        // Update the backend about the selection change
+
         await ipcRenderer.invoke('select-files', { filenames: newSelectedFiles });
-        
-        // Then delete the file
+
         await ipcRenderer.invoke('delete-file', { filename });
-        
-        // Refresh the file list
+
         const files = await ipcRenderer.invoke('get-files');
         setUploadedFiles(files);
-        
-        // Force React to re-render by updating a state
-        setChatMessage(prev => prev + ""); // This is a hack to trigger re-render
-        
-        // Force the chat input to be enabled and focused after a short delay
+
+        setChatMessage(prev => prev + "");
+
         setTimeout(() => {
           const inputs = document.querySelectorAll('.chat-input') as NodeListOf<HTMLTextAreaElement>;
           inputs.forEach(input => {
@@ -475,7 +445,7 @@ const handleSubmit = async (event: React.FormEvent) => {
   const userMessage: Message = { text: currentMessage, isUser: true };
   setMessages(prevMessages => [...prevMessages, userMessage]);
   setLoading(true);
-  setIsStreaming(false); // Reset streaming state
+  setIsStreaming(false);
   setChatMessage("");
   setHasStarted(true);
   setAutoScroll(true);
@@ -488,8 +458,6 @@ const handleSubmit = async (event: React.FormEvent) => {
   try {
     console.log("Attempting to send message:", currentMessage);
 
-    // Add a special prefix that Python backend can detect
-    // Use Base64 encoding to completely avoid formatting issues
     const encodedMessage = "_BASE64_" + btoa(unescape(encodeURIComponent(currentMessage)));
 
     console.log("Sending encoded message");
@@ -501,16 +469,16 @@ const handleSubmit = async (event: React.FormEvent) => {
       { text: "❌ Error: Failed to send message", htmlContent: marked("❌ Error: Failed to send message"), isUser: false }
     ]);
   } finally {
-    // Note: Don't reset loading here, it will be handled by the messageHandler
+
   }
 };
 
 const handleKeyPress = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
   if (event.key === 'Enter' && !event.shiftKey) {
-    // Prevent form submission if uploading is in progress
+
     if (isUploading) {
       event.preventDefault();
-      return; // Don't proceed with submission
+      return;
     }
 
     event.preventDefault();
@@ -552,16 +520,14 @@ const handleKeyPress = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
   }
 
   const resetInputState = () => {
-    // Reset all input-related states
+
     setIsUploading(false);
-    
-    // Force-enable all chat inputs
+
     const inputs = document.querySelectorAll('.chat-input') as NodeListOf<HTMLTextAreaElement>;
     inputs.forEach(input => {
       input.disabled = false;
     });
-    
-    // Focus the appropriate input
+
     setTimeout(() => {
       const input = hasStarted 
         ? document.querySelector('.chat-form .chat-input') 
@@ -759,14 +725,12 @@ const handleKeyPress = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
         rows={1}
         style={{ height: 'auto' }}
         onFocus={() => {
-          // Ensure the input is enabled when focused
           const inputs = document.querySelectorAll('.chat-input') as NodeListOf<HTMLTextAreaElement>;
           inputs.forEach(input => {
             input.disabled = false;
           });
         }}
         onClick={() => {
-          // Ensure the input is enabled when clicked
           const inputs = document.querySelectorAll('.chat-input') as NodeListOf<HTMLTextAreaElement>;
           inputs.forEach(input => {
             input.disabled = false; 

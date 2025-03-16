@@ -1,4 +1,4 @@
-/************* General ****************/
+
 *,
 *::before,
 *::after {
@@ -7,14 +7,8 @@
 }
 
 :root{
-  /* Color Pallet */
-  /*OG colors -- primary:A9B5DF secondary:7886C7 selected:FFF2F2 highlight:2D336B*/
   --primary-bg: #E8E8E4;
   --secondary-bg: #9CA9D6;
-  /*--selected-color: #E8E8E4;
-  --highlight-color: #2D336B;
-  --primary-bg: #8494C8;
-  --secondary-bg: #5A6BB1;*/
   --selected-color: #F5F7FF;
   --highlight-color: #2D3D78;
   --border-color: rgba(255, 255, 255, 0.1);
@@ -22,7 +16,6 @@
   --text-colorw: white;
   --button-hover: white;
 
-  /* Golden Ratio Text Sizes */
   --base-size: 24px;
   --ratio: 1.618;
   --h1-size: calc(var(--base-size) * var(--ratio) * var(--ratio) * var(--ratio));
@@ -35,24 +28,20 @@
   --font: 'Roboto', Arial, serif, sans-serif;
   --font-size: 16px;
 
-  /* Spacing System */
   --margin-xxs: 0.25rem;
   --margin-xs: 0.5rem;
   --margin-s: 1rem;
   --margin-m: 1.5rem;
   --margin-l: 2rem;
 
-  /* Container Widths */
   --sidebar-width: 400px;
   --chat-max-width: 50%;
   --message-max-width: 70%;
 
-  /* Border Radius */
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 20px;
 
-  /* Shadows */
   --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
   --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.1);
@@ -75,9 +64,7 @@ body {
   overflow: hidden;
   align-items: center;
 }
-/************* General ****************/
 
-/************* Tooltips ****************/
 [data-tooltip] {
   position: relative;
 }
@@ -135,9 +122,7 @@ body {
   border-width: 5px 5px 5px 0;
   border-color: transparent var(--highlight-color) transparent transparent;
 }
-/************* Tooltips ****************/
 
-/************* Alert Popup ****************/
 .alert-overlay {
   position: fixed;
   top: 0;
@@ -192,9 +177,7 @@ body {
 .alert-close-btn:hover {
   background-color: var(--primary-bg);
 }
-/************* Alert Popup ****************/
 
-/************* Sidebar ****************/
 .sidebar-container {
   position: relative;
   max-width: var(--sidebar-width);
@@ -263,7 +246,6 @@ body {
   gap: 0.5rem;
 }
 
-/* Adjust center content when sidebar is closed */
 .sidebar-closed ~ .center {
   margin-left: 0;
 }
@@ -279,7 +261,6 @@ body {
 .logo-container > h2 {
   font-size: var(--h3-size);
   color: var(--text-color);
-  /*font-family: 'Times New Roman', Times, serif;*/
 }
 
 .files-section {
@@ -367,7 +348,6 @@ body {
   }
 }
 
-/* Responsive Design */
 @media (max-width: 1000px) {
   .root {
     --chat-min-width: 80%;
@@ -377,7 +357,6 @@ body {
     transform: translateX(-100%);
     transition: transform 0.3s ease;
     z-index: 1500;
-   /* display: none; */
   }
 
   .sidebar-container {
@@ -392,10 +371,6 @@ body {
     position: absolute;
     left: 200px;
   }
-
-  /*.sidebar-container.open .sidebar {
-    transform: translateX(0);
-  } */
   
   .chat-container {
     padding: 1rem;
@@ -459,10 +434,7 @@ body {
     flex-direction: column;
   } 
 }
-/************* Sidebar ****************/
 
-
-/************* Center Start ****************/
 .centered-start {
   flex: 4;
   display: flex;
@@ -510,10 +482,7 @@ body {
   font-size: 1rem;
   text-align: center;
 }
-/************* Center Start ****************/
 
-
-/************* Chat ****************/
 .center {
   flex: 3;
   display: flex;
@@ -541,7 +510,7 @@ body {
   gap: 1rem;
   overflow-y: auto;
   padding: 1rem;
-  margin-bottom: 65px; /* Space for the chat form */
+  margin-bottom: 65px;
 }
 
 .message {
@@ -664,12 +633,12 @@ body {
   color: var(--text-color);
   font-size: var(--small-size);
   font-family: Roboto, Arial;
-  min-height: 1.5rem; /* Minimum height for the textarea */
-  max-height: 13rem; /* Maximum height slightly less than container */
-  resize: none; /* Prevent manual resizing */
-  overflow-y: auto; /* Add scrollbar when needed */
-  line-height: 1.5; /* Improve text readability */
-  padding: 0; /* Remove padding since container has padding */
+  min-height: 1.5rem;
+  max-height: 13rem;
+  resize: none;
+  overflow-y: auto;
+  line-height: 1.5;
+  padding: 0;
   margin: 0;;
   width: 100%;
 }
@@ -680,7 +649,6 @@ body {
   text-align: center;
   font-size: 0.8;
   color: var(--text-color);
-  /*transform: translateX(-200%);*/
 }
 
 .Llama-disclaimer {
@@ -751,11 +719,9 @@ body {
   background-color: rgba(239, 68, 68, 0.1);
   border-radius: 4px;
 }
-/************* Chat ****************/
 
-/************* Character Counter ****************/
 .input-container {
-  position: relative; /* Ensure absolute positioning works relative to this container */
+  position: relative;
   opacity: 1 !important;
 }
 
@@ -767,22 +733,20 @@ body {
   border-radius: 20%;
   padding-top: 2px;
   padding-left: 2px;
-  user-select: none; /* Prevent selection of the counter text */
-  pointer-events: none; /* Makes sure it doesn't interfere with clicking */
+  user-select: none;
+  pointer-events: none;
   background: var(--secondary-bg);
-  z-index: 5000; /* Ensures it appears above the textarea */
+  z-index: 5000;
 }
 
 .char-count-warning {
-  color: #ef4444; /* Red color for when approaching limit */
+  color: #ef4444;
 }
 
 .char-count-normal {
-  color: var(--text-color); /* Use your text color variable */
+  color: var(--text-color);
 }
-/************* Character Counter ****************/
 
-/************* Rich Text ****************/
 .rich-text {
   line-height: 1.6;
   overflow-wrap: break-word;
@@ -860,8 +824,6 @@ body {
   tab-size: 4;
 }
 
-
-/* Add specific ASCII art handling */
 .rich-text .ascii-art {
   font-family: 'Courier New', Courier, monospace;
   white-space: pre;
@@ -916,7 +878,6 @@ body {
   font-family: inherit;
 }
 
-/* Preserve ASCII art characters */
 .rich-text pre code:not([class*="language-"]) {
   font-variant-ligatures: none;
   -webkit-font-variant-ligatures: none;
@@ -961,10 +922,9 @@ body {
 }
 
 .interrupt-button:hover {
-  color: #ef4444; /* Red color on hover to indicate stopping */
+  color: #ef4444;
 }
 
-/* Optional animation for the interrupt button to make it more noticeable */
 @keyframes pulse {
   0% { transform: scale(1); }
   50% { transform: scale(1.1); }
@@ -986,58 +946,23 @@ body {
 }
 
 
-/*
-.rich-text ul {
-  list-style-type: disc;
-  padding-left: 20px;
-  margin: 10px 0;
-}
-
-.rich-text li {
-  margin: 5px 0;
-}
-
-.rich-text p {
-  margin: 10px 0;
-}
-
-.rich-text h1,
-.rich-text h2,
-.rich-text h3,
-.rich-text h4,
-.rich-text h5,
-.rich-text h6 {
-  margin: 10px 0;
-}
-
-.rich-text blockquote {
-  margin: 10px 0;
-  padding: 10px 20px;
-  border-left: 5px solid #ccc;
-  background-color: #f9f9f9;
-  color: #666;
-  font-style: italic;
-}
-/************* Rich Text ****************/
-
-/************* Input Container ****************/
 .input-container {
   position: relative;
   display: flex;
   gap: 1rem;
   flex: 1;
   font-size: var(--font-size);
-  background-color: var(--secondary-bg); /* Solid background color */
+  background-color: var(--secondary-bg);
   border-radius: 20px;
   z-index: 100;
   box-shadow: inset 1px 2px 4px rgba(0, 0, 0, 0.2),
-              0 2px 10px rgba(0, 0, 0, 0.1); /* Add an outer shadow for depth */
+              0 2px 10px rgba(0, 0, 0, 0.1);
   max-width: calc(var(--chat-max-width) - 80px);
-  min-height: 2rem; /* Minimum height */
-  max-height: 15rem; /* Maximum height */
+  min-height: 2rem;
+  max-height: 15rem;
   height: auto;
-  overflow-y: auto; /* Add scrollbar when content exceeds max height */
-  align-items: flex-start; /* Align to top instead of center */
+  overflow-y: auto;
+  align-items: flex-start;
   padding: 0.75rem 1rem;
   width: 100%;
   
@@ -1046,7 +971,6 @@ body {
   isolation: isolate;
 }
 
-/* Ensure complete opacity by adding a solid background */
 .input-container::before {
   content: "";
   position: absolute;
@@ -1054,19 +978,17 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: var(--secondary-bg); /* Same as container */
+  background-color: var(--secondary-bg);
   border-radius: 20px;
-  z-index: -1; /* Behind the content */
-  opacity: 1; /* Fully opaque */
+  z-index: -1;
+  opacity: 1;
 }
 
-/* Add styles specifically for when the container is in the centered start view */
 .chat-form-centered .input-container {
   background-color: var(--secondary-bg);
   opacity: 1;
 }
 
-/* Make sure the form sits above messages */
 .chat-form {
   z-index: 99;
   background: transparent;
@@ -1076,10 +998,9 @@ body {
   z-index: 99;
 }
 
-/* Updated chat input styles */
 .chat-input {
   flex: 1;
-  background: transparent; /* This is fine since parent is opaque */
+  background: transparent;
   border: none;
   outline: none;
   color: var(--text-color);
@@ -1094,11 +1015,10 @@ body {
   margin: 0;
   width: 100%;
   position: relative;
-  z-index: 2; /* Above the pseudo-element */
+  z-index: 2;
   opacity: 1;
 }
 
-/* In case the input area becomes visible when typing a lot */
 .message-display {
-  padding-bottom: 120px; /* Add extra padding at the bottom to accommodate the input area */
+  padding-bottom: 120px;
 }

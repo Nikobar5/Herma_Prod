@@ -7,7 +7,6 @@ const { shell } = require('electron');
 
 const execAsync = util.promisify(exec);
 
-// Define types for your IPC messages
 interface ChatMessage {
   message: string;
 }
@@ -40,7 +39,6 @@ const STORAGE_DIR = path.join(__dirname, '../../storage');
 const UPLOADS_DIR = path.join(STORAGE_DIR, 'uploads');
 const PYTHON_DIR = path.join(__dirname, '../../python/scripts');
 
-// Python process state
 let pythonProcess: ReturnType<typeof spawn> | null = null;
 let activeChatRequestId: string | null = null;
 const messageCallbacks = new Map<string, MessageCallback>();
@@ -73,7 +71,6 @@ async function initializePythonShell(): Promise<void> {
                 console.error('Error parsing Python output:', err);
             }
         } else {
-            // Regular debug output, just log to console
             console.log('Python:', line);
         }
       }
@@ -94,7 +91,6 @@ async function initializePythonShell(): Promise<void> {
       setTimeout(initializePythonShell, 1000);
     });
 
-    // Verify connection
     await new Promise<void>((resolve, reject) => {
       const testRequestId = 'test-connection';
       const timeout = setTimeout(() => {
@@ -142,10 +138,9 @@ function killOllama(): Promise<void> {
   return new Promise((resolve) => {
     const platform = process.platform;
 
-    // Use more forceful commands to ensure Ollama is killed
     const command = platform === 'win32'
       ? 'taskkill /F /IM ollama.exe'
-      : 'pkill -9 ollama || killall -9 ollama || true';  // Force kill and ignore errors
+      : 'pkill -9 ollama || killall -9 ollama || true';
 
     exec(command, (error: Error | null) => {
       if (error && !error.message.includes('No matching processes')) {
@@ -156,11 +151,10 @@ function killOllama(): Promise<void> {
   });
 }
 
-// Update the startOllama function to ensure it waits before starting
 async function startOllama() {
   try {
     await killOllama();
-    await new Promise(resolve => setTimeout(resolve, 1000));  // Wait longer
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     console.log("Starting Ollama service...");
     const ollama = spawn('ollama', ['serve']);
@@ -177,16 +171,13 @@ async function startOllama() {
       console.log(`Ollama process exited with code ${code}`);
     });
 
-    // Wait for Ollama to be ready
-    await new Promise(resolve => setTimeout(resolve, 2000));  // Give it time to initialize
+    await new Promise(resolve => setTimeout(resolve, 2000));
     console.log("Ollama should be ready now");
 
   } catch (error) {
     console.error('Error starting Ollama:', error);
   }
 }
-
-// Add a proper quit method that can be called from anywhere
 function quitApplication() {
   if (pythonProcess) {
     pythonProcess.stdin.write(
@@ -205,20 +196,18 @@ function quitApplication() {
 async function setupIPC() {
   await initializePythonShell();
 
-  // Chat handler
 ipcMain.handle('start-chat', async (event: Electron.IpcMainInvokeEvent, { message }: ChatMessage) => {
   await ensurePythonShell();
   const requestId = (++requestCounter).toString();
 
-  // Store the active chat request ID
   activeChatRequestId = requestId;
 
   return new Promise((resolve, reject) => {
     messageCallbacks.set(requestId, (response: PythonMessage) => {
-      console.log("Electron received from Python:", response);  // Add this debug line
+      console.log("Electron received from Python:", response);
       if (response.error) {
         messageCallbacks.delete(requestId);
-        activeChatRequestId = null; // Clear active request on error
+        activeChatRequestId = null;
         reject(new Error(response.error));
       } else if (response.chunk) {
         event.sender.send('chat-response', response.chunk);
@@ -226,7 +215,7 @@ ipcMain.handle('start-chat', async (event: Electron.IpcMainInvokeEvent, { messag
         console.log("Electron received 'done' signal, sending [DONE] to frontend");
         event.sender.send('chat-response', '[DONE]');
         messageCallbacks.delete(requestId);
-        activeChatRequestId = null; // Clear active request when done
+        activeChatRequestId = null;
         resolve(null);
       }
     });
@@ -246,7 +235,6 @@ ipcMain.handle('start-chat', async (event: Electron.IpcMainInvokeEvent, { messag
   });
 });
 
-  // File upload handler
   ipcMain.handle('upload-file', async (_event: Electron.IpcMainInvokeEvent, { filename, data }: FileUpload) => {
     await ensurePythonShell();
     const requestId = (++requestCounter).toString();
@@ -328,7 +316,6 @@ ipcMain.handle('start-chat', async (event: Electron.IpcMainInvokeEvent, { messag
       });
     });
 
-  // Delete file handler
   ipcMain.handle('delete-file', async (_event: Electron.IpcMainInvokeEvent, { filename }: FileOperation) => {
     await ensurePythonShell();
     const requestId = (++requestCounter).toString();
@@ -363,10 +350,8 @@ ipcMain.handle('interrupt-chat', async () => {
   try {
     console.log("Interrupting chat:", activeChatRequestId);
 
-    // First, kill the Ollama process to immediately stop generation
     await killOllama();
 
-    // Send an interrupt signal to Python
     pythonProcess.stdin.write(
       JSON.stringify({
         requestId: 'interrupt-' + activeChatRequestId,
@@ -375,7 +360,6 @@ ipcMain.handle('interrupt-chat', async () => {
       }) + '\n'
     );
 
-    // Mark the request as done
     const callback = messageCallbacks.get(activeChatRequestId);
     if (callback) {
       callback({
@@ -385,16 +369,13 @@ ipcMain.handle('interrupt-chat', async () => {
       messageCallbacks.delete(activeChatRequestId);
     }
 
-    // Send a [DONE] message to the renderer to signal completion
     const windows = BrowserWindow.getAllWindows();
      windows.forEach((window: Electron.BrowserWindow) => {
       window.webContents.send('chat-response', '[DONE]');
     });
 
-    // Add a brief delay to allow proper cleanup
     await new Promise(resolve => setTimeout(resolve, 100));
 
-    // Restart Ollama for future requests
     startOllama();
 
     activeChatRequestId = null;
@@ -409,10 +390,8 @@ ipcMain.handle('interrupt-chat', async () => {
     try {
       const filePath = path.join(UPLOADS_DIR, filename);
 
-      // Check if file exists
       await fs.access(filePath);
 
-      // Open file with default system application
       await shell.openPath(filePath);
 
       return { success: true };
@@ -423,7 +402,6 @@ ipcMain.handle('interrupt-chat', async () => {
     }
   });
 
-  // Select files handler
   ipcMain.handle('select-files', async (_event: Electron.IpcMainInvokeEvent, { filenames }: FileSelection) => {
     await ensurePythonShell();
     const requestId = (++requestCounter).toString();
@@ -451,7 +429,6 @@ ipcMain.handle('interrupt-chat', async () => {
   });
 }
 
-// Update your createWindow function with these changes
 async function createWindow() {
   const win = new BrowserWindow({
     width: 1200,
@@ -463,7 +440,6 @@ async function createWindow() {
     }
   });
 
-  // Add event listener for webContents errors
   win.webContents.on('did-fail-load', (
     _event: Electron.Event,
     errorCode: number,
@@ -472,14 +448,12 @@ async function createWindow() {
     console.error(`Page failed to load: ${errorDescription} (${errorCode})`);
   });
 
-  // For the 'crashed' event
   win.webContents.on('crashed', (
     _event: Electron.Event
   ) => {
     console.error('Renderer process crashed');
   });
 
-  // Add listener for console messages from renderer
 win.webContents.on('console-message', (
   _event: Electron.Event,
   level: number,
@@ -513,7 +487,6 @@ win.webContents.on('console-message', (
     try {
       console.log('Running in production mode, loading diagnostic page...');
 
-      // First, try to load the diagnostic page
       const debugPath = path.join(__dirname, '../../frontend/dist/debug.html');
 
       try {
@@ -523,12 +496,9 @@ win.webContents.on('console-message', (
         await win.loadFile(debugPath);
         console.log('Successfully loaded diagnostic page');
 
-        // Don't continue to the original loading code - let user test and click "Load App" button
-        // to load the actual app if the diagnostic page works
       } catch (debugErr) {
         console.error('Diagnostic page not found, falling back to normal loading:', debugErr);
 
-        // Continue with your original path-finding approach
         const possiblePaths = [
           path.join(__dirname, '../frontend/dist/index.html'),
           path.join(__dirname, '../../frontend/dist/index.html'),
@@ -539,7 +509,6 @@ win.webContents.on('console-message', (
         let indexPath = null;
         let foundPath = false;
 
-        // Try each path until we find one that exists
         for (const testPath of possiblePaths) {
           try {
             await fs.access(testPath);
@@ -553,22 +522,19 @@ win.webContents.on('console-message', (
         }
 
         if (!foundPath) {
-          // As a last resort, try to list directories to help debug
+
           console.error('Could not find index.html in any expected location');
           try {
             const appDir = app.getAppPath();
             console.log('App directory:', appDir);
 
-            // List files in the app directory
             const files = await fs.readdir(appDir);
             console.log('Files in app directory:', files);
 
-            // Check if frontend exists
             if (files.includes('frontend')) {
               const frontendFiles = await fs.readdir(path.join(appDir, 'frontend'));
               console.log('Files in frontend directory:', frontendFiles);
 
-              // Check if dist exists
               if (frontendFiles.includes('dist')) {
                 const distFiles = await fs.readdir(path.join(appDir, 'frontend', 'dist'));
                 console.log('Files in dist directory:', distFiles);
@@ -581,7 +547,6 @@ win.webContents.on('console-message', (
           throw new Error('Could not find index.html in any expected location');
         }
 
-        // Load the file
         console.log('About to load file:', indexPath);
         await win.loadFile(indexPath);
         console.log('Successfully loaded index.html');
@@ -589,7 +554,6 @@ win.webContents.on('console-message', (
     } catch (err) {
       console.error('Failed to load built file:', err);
 
-      // Show error in window instead of blank screen
       win.webContents.loadURL(`data:text/html;charset=utf-8,
         <html>
           <head><title>Error Loading App</title></head>
@@ -603,7 +567,6 @@ win.webContents.on('console-message', (
     }
   }
 
-  // Always open DevTools for debugging
   win.webContents.openDevTools();
 }
 
@@ -613,13 +576,10 @@ app.whenReady().then(async () => {
   createWindow();
 });
 
-// Handle window close events properly
 app.on('window-all-closed', () => {
-  // On macOS applications keep running unless user explicitly quits
   if (process.platform !== 'darwin') {
     app.quit();
   } else {
-    // For macOS, we still need to tell Python to save data
     if (pythonProcess) {
       pythonProcess.stdin.write(
         JSON.stringify({
@@ -632,15 +592,12 @@ app.on('window-all-closed', () => {
   }
 });
 
-// Properly typed before-quit handler
+
 app.on('before-quit', async (event: Electron.Event) => {
-  // If we haven't cleaned up yet, prevent immediate quit to allow cleanup
   if (pythonProcess) {
-    // Only prevent default if this is the first time
     event.preventDefault();
 
     try {
-      // Send shutdown to Python
       pythonProcess.stdin.write(
         JSON.stringify({
           requestId: 'shutdown',
@@ -649,21 +606,19 @@ app.on('before-quit', async (event: Electron.Event) => {
         }) + '\n'
       );
 
-      // Give Python time to save
+
       await new Promise(resolve => setTimeout(resolve, 1000));
       if (pythonProcess) {
         pythonProcess.kill();
         pythonProcess = null;
       }
 
-      // Then kill Ollama
       await killOllama();
 
-      // Now quit for real
       app.quit();
     } catch (error) {
       console.error('Error during shutdown:', error);
-      app.quit(); // Try to quit anyway
+      app.quit();
     }
   }
 });
