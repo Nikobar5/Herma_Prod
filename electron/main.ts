@@ -41,6 +41,7 @@ const PYTHON_DIR = path.join(__dirname, '../../python/scripts');
 
 let pythonProcess: ReturnType<typeof spawn> | null = null;
 let activeChatRequestId: string | null = null;
+let ollamaProcess: ReturnType<typeof spawn> | null = null;
 const messageCallbacks = new Map<string, MessageCallback>();
 let requestCounter = 0;
 let buffer = '';
@@ -136,8 +137,18 @@ async function ensurePythonShell(): Promise<void> {
 
 function killOllama(): Promise<void> {
   return new Promise((resolve) => {
-    const platform = process.platform;
+    // First try to kill our managed Ollama process
+    if (ollamaProcess) {
+      try {
+        ollamaProcess.kill();
+      } catch (err) {
+        console.error("Error killing managed Ollama process:", err);
+      }
+      ollamaProcess = null;
+    }
 
+    // As a fallback, use system commands to kill any Ollama processes
+    const platform = process.platform;
     const command = platform === 'win32'
       ? 'taskkill /F /IM ollama.exe'
       : 'pkill -9 ollama || killall -9 ollama || true';
@@ -156,8 +167,49 @@ async function startOllama() {
     await killOllama();
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    console.log("Starting Ollama service...");
-    const ollama = spawn('ollama', ['serve']);
+    // Get the platform-specific Ollama path
+    let ollamaPath;
+    const platform = process.platform;
+
+    if (process.env.NODE_ENV === 'development') {
+      // Use system ollama in development
+      ollamaPath = 'ollama';
+    } else {
+      // In production, use bundled binaries
+      if (platform === 'darwin') {
+        ollamaPath = path.join(process.resourcesPath, 'ollama', 'darwin', 'ollama');
+      } else if (platform === 'win32') {
+        ollamaPath = path.join(process.resourcesPath, 'ollama', 'win32', 'ollama.exe');
+      } else {
+        // Linux
+        ollamaPath = path.join(process.resourcesPath, 'ollama', 'linux', 'bin', 'ollama');
+      }
+    }
+
+    console.log("Starting Ollama service from:", ollamaPath);
+
+    // Ensure the binary is executable (for macOS and Linux)
+    if (platform !== 'win32' && process.env.NODE_ENV !== 'development') {
+      try {
+        await execAsync(`chmod +x "${ollamaPath}"`);
+        console.log("Made Ollama executable");
+      } catch (error) {
+        console.error('Error making Ollama executable:', error);
+      }
+    }
+
+    // Create custom models directory in user data folder
+    const modelsDir = path.join(app.getPath('userData'), 'ollama-models');
+    await fs.mkdir(modelsDir, { recursive: true });
+
+    // Set up environment variables for Ollama
+    const env = {
+      ...process.env,
+      OLLAMA_MODELS: modelsDir
+    };
+
+    // Start Ollama with platform-specific settings
+    const ollama = spawn(ollamaPath, ['serve'], { env });
 
     ollama.stdout.on('data', (data: Buffer) => {
       console.log(`Ollama stdout: ${data}`);
@@ -178,6 +230,7 @@ async function startOllama() {
     console.error('Error starting Ollama:', error);
   }
 }
+
 function quitApplication() {
   if (pythonProcess) {
     pythonProcess.stdin.write(
@@ -567,7 +620,6 @@ win.webContents.on('console-message', (
     }
   }
 
-  win.webContents.openDevTools();
 }
 
 app.whenReady().then(async () => {

@@ -45,12 +45,27 @@
   "build": {
     "extraResources": [
       {
+        "from": "resources/ollama",
+        "to": "ollama",
+        "filter": ["**/*"]
+      },
+      {
         "from": "python",
         "to": "python",
-        "filter": [
-          "**/*"
-        ]
+        "filter": ["**/*"]
       }
-    ]
+    ],
+    "asarUnpack": ["resources/ollama/**"],
+    "mac": {
+      "target": ["dmg"],
+      "hardenedRuntime": true
+    },
+    "linux": {
+      "target": ["AppImage"],
+      "executableName": "herma"
+    },
+    "win": {
+      "target": ["nsis"]
+    }
   }
 }
