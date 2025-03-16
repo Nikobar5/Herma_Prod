@@ -1,5 +1,5 @@
 def make_prompt(context, currently_used_data):
-    system_content = "You are a helpful AI assistant named Herma. Answer the most recent question to the best of your ability."
+    system_content = "You are a helpful AI assistant named Herma. Answer all questions to the best of your ability."
     if context:
         safe_context = context.replace('{', '{{').replace('}', '}}')
         num_docs = len(currently_used_data)

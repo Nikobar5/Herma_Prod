@@ -3,3 +3,4 @@ db_store/*
 uploads/*
 node_modules/
 storage/
+new_venv/*
