@@ -51,7 +51,33 @@ async function initializePythonShell(): Promise<void> {
 
   try {
     console.log('Initializing Python process...');
-    pythonProcess = spawn('python', [path.join(PYTHON_DIR, 'main.py')], {
+
+    // Determine which Python executable to use based on environment
+    let pythonExePath: string;
+    let pythonArgs: string[] = [];
+
+    if (process.env.NODE_ENV === 'development') {
+      // In development, use Python interpreter and script
+      pythonExePath = 'python';
+      pythonArgs = [path.join(PYTHON_DIR, 'main.py')];
+    } else {
+      // In production, use PyInstaller executable
+      if (process.platform === 'win32') {
+        pythonExePath = path.join(process.resourcesPath, 'python', 'herma_python.exe');
+      } else {
+        pythonExePath = path.join(process.resourcesPath, 'python', 'herma_python');
+
+        // Ensure the executable has proper permissions on Unix-like systems
+        try {
+          await execAsync(`chmod +x "${pythonExePath}"`);
+        } catch (error) {
+          console.error('Error setting executable permissions:', error);
+        }
+      }
+    }
+
+    console.log(`Using Python executable: ${pythonExePath}`);
+    pythonProcess = spawn(pythonExePath, pythonArgs, {
       stdio: ['pipe', 'pipe', 'pipe']
     });
 

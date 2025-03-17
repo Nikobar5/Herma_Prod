@@ -4,4 +4,4 @@ uploads/*
 node_modules/
 storage/
 new_venv/*
-resources/*
+resources/

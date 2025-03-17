@@ -1,6 +1,5 @@
 from langchain_ollama import ChatOllama
 from prompt_maker import make_prompt
-from langchain.globals import set_debug
 from uploaded_data import Uploaded_data
 from rag_querying import query_rag
 import glob
