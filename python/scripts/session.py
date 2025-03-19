@@ -11,7 +11,6 @@ import re
 
 class Session:
     def __init__(self, currently_used_data):
-        set_debug(False)
         self.session_summary = ""
         self.session_history = ""
         self.num_exchanges = 0

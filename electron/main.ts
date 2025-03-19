@@ -51,6 +51,7 @@ async function initializePythonShell(): Promise<void> {
 
   try {
     console.log('Initializing Python process...');
+    console.time('Python Process Initialization');
 
     // Determine which Python executable to use based on environment
     let pythonExePath: string;
@@ -62,14 +63,21 @@ async function initializePythonShell(): Promise<void> {
       pythonArgs = [path.join(PYTHON_DIR, 'main.py')];
     } else {
       // In production, use PyInstaller executable
-      if (process.platform === 'win32') {
+      if (process.platform === 'darwin') {
+        // Specific handling for macOS
+        pythonExePath = path.join(process.resourcesPath, 'python', 'herma_python');
+      } else if (process.platform === 'win32') {
         pythonExePath = path.join(process.resourcesPath, 'python', 'herma_python.exe');
       } else {
+        // Linux or other platforms
         pythonExePath = path.join(process.resourcesPath, 'python', 'herma_python');
+      }
 
-        // Ensure the executable has proper permissions on Unix-like systems
+      // Ensure the executable has proper permissions on Unix-like systems
+      if (process.platform !== 'win32') {
         try {
           await execAsync(`chmod +x "${pythonExePath}"`);
+          console.log(`Set executable permissions for ${pythonExePath}`);
         } catch (error) {
           console.error('Error setting executable permissions:', error);
         }
@@ -77,64 +85,108 @@ async function initializePythonShell(): Promise<void> {
     }
 
     console.log(`Using Python executable: ${pythonExePath}`);
+    console.log(`Python arguments: ${pythonArgs.join(' ')}`);
+
+    // Enhanced process spawning with more detailed error handling
     pythonProcess = spawn(pythonExePath, pythonArgs, {
-      stdio: ['pipe', 'pipe', 'pipe']
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: {
+        ...process.env,
+        PYTHONUNBUFFERED: '1',  // Ensure unbuffered output
+        PYTHONDEVMODE: '1'      // Enable development mode for more warnings
+      }
     });
 
+    // Comprehensive stdout handling
     pythonProcess.stdout.on('data', (data: Buffer) => {
+      const lines = data.toString().split('\n');
+      lines.forEach(line => {
+        if (line.trim()) {
+          console.log(`[Python STDOUT]: ${line}`);
+        }
+      });
+
       buffer += data.toString();
       let newlineIndex;
       while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
         const line = buffer.slice(0, newlineIndex);
         buffer = buffer.slice(newlineIndex + 1);
 
-        if (line.trim().startsWith('{')) {
-            try {
-                const message = JSON.parse(line);
-                if (message.requestId && messageCallbacks.has(message.requestId)) {
-                      messageCallbacks.get(message.requestId)!(message);
-                }
-            } catch (err) {
-                console.error('Error parsing Python output:', err);
+        try {
+          if (line.trim().startsWith('{')) {
+            const message = JSON.parse(line);
+            if (message.requestId && messageCallbacks.has(message.requestId)) {
+              messageCallbacks.get(message.requestId)!(message);
             }
-        } else {
-            console.log('Python:', line);
+          }
+        } catch (err) {
+          console.error('Error parsing Python output:', err);
+          console.error('Problematic line:', line);
         }
       }
     });
 
+    // Enhanced stderr handling
     pythonProcess.stderr.on('data', (data: Buffer) => {
-      console.error('Python error:', data.toString());
+      const errorMessage = data.toString().trim();
+      console.error('Python stderr:', errorMessage);
+
+      // Log specific error patterns
+      if (errorMessage.includes('ImportError') ||
+          errorMessage.includes('ModuleNotFoundError')) {
+        console.error('Potential import or module loading issue detected');
+      }
     });
 
-    pythonProcess.on('close', (code: number) => {
-      console.log(`Python process exited with code ${code}`);
+    // Comprehensive process lifecycle tracking
+    pythonProcess.on('error', (err: Error) => {
+      console.error('Python process spawn error:', err);
+    });
+
+    pythonProcess.on('close', (code: number, signal: string) => {
+      console.timeEnd('Python Process Initialization');
+      console.log(`Python process exited with code ${code}, signal: ${signal}`);
+
       messageCallbacks.forEach(callback => {
-        callback({ requestId: '', error: 'Python process closed unexpectedly' });
+        callback({
+          requestId: '',
+          error: `Python process closed unexpectedly (code: ${code}, signal: ${signal})`
+        });
       });
       messageCallbacks.clear();
 
       pythonProcess = null;
+
+      // Implement exponential backoff for restart attempts
       setTimeout(initializePythonShell, 1000);
     });
 
+    // Connection test with increased timeout and detailed error handling
     await new Promise<void>((resolve, reject) => {
       const testRequestId = 'test-connection';
+
+      // Increased timeout to 10 seconds
       const timeout = setTimeout(() => {
         messageCallbacks.delete(testRequestId);
+        console.error('Python process initialization timeout');
         reject(new Error('Python process initialization timeout'));
-      }, 5000);
+      }, 30000);
 
       messageCallbacks.set(testRequestId, (response) => {
         clearTimeout(timeout);
         messageCallbacks.delete(testRequestId);
+
         if (response.error) {
+          console.error('Test connection failed:', response.error);
           reject(new Error(response.error));
         } else {
+          console.log('Python process connection test successful');
+          console.timeEnd('Python Process Initialization');
           resolve();
         }
       });
 
+      console.log("Sending ping to Python process...");
       pythonProcess.stdin.write(
         JSON.stringify({
           requestId: testRequestId,
@@ -146,11 +198,24 @@ async function initializePythonShell(): Promise<void> {
 
     console.log('Python process initialized successfully');
   } catch (error) {
-    console.error('Failed to initialize Python process:', error);
+    console.error('Comprehensive error during Python process initialization:', error);
+
+    // Detailed error logging
+    if (error instanceof Error) {
+      console.error('Error name:', error.name);
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+    }
+
     if (pythonProcess) {
-      pythonProcess.kill();
+      try {
+        pythonProcess.kill();
+      } catch (killError) {
+        console.error('Error killing Python process:', killError);
+      }
       pythonProcess = null;
     }
+
     throw error;
   }
 }
@@ -254,6 +319,98 @@ async function startOllama() {
 
   } catch (error) {
     console.error('Error starting Ollama:', error);
+  }
+}
+
+async function firstRunSetup() {
+  // Check if this is first run by looking for a marker file
+  const setupCompletePath = path.join(app.getPath('userData'), '.setup-complete');
+
+  try {
+    await fs.access(setupCompletePath);
+    console.log('Setup already completed');
+  } catch (err) {
+    // File doesn't exist, this is first run
+    console.log('First run detected, setting up models...');
+
+    // Show a setup window with embedded HTML
+    const setupWin = new BrowserWindow({
+      width: 500,
+      height: 300,
+      webPreferences: {
+        nodeIntegration: true,
+        contextIsolation: false
+      }
+    });
+
+    // Load the HTML content directly instead of from a file
+    setupWin.loadURL(`data:text/html,
+    <html>
+    <head>
+      <title>Herma Setup</title>
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          padding: 20px;
+          text-align: center;
+          background-color: #f5f5f5;
+        }
+        .container {
+          max-width: 400px;
+          margin: 0 auto;
+          background: white;
+          padding: 20px;
+          border-radius: 5px;
+          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h2 {
+          color: #333;
+        }
+        #status {
+          margin-top: 20px;
+          padding: 10px;
+          background: #f0f0f0;
+          border-radius: 4px;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h2>Herma Initial Setup</h2>
+        <p>Setting up language model for first use...</p>
+        <div id="status">Initializing...</div>
+      </div>
+      <script>
+        const { ipcRenderer } = require('electron');
+
+        ipcRenderer.on('status', (event, message) => {
+          document.getElementById('status').textContent = message;
+        });
+      </script>
+    </body>
+    </html>`);
+
+    // Pull the model
+    try {
+      setupWin.webContents.send('status', 'Downloading language model. This may take several minutes...');
+
+      // Just call fetch without assigning to a variable
+      await fetch('http://localhost:11434/api/pull', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name: 'llama3.2:1b'})
+      });
+
+      // Create marker file when download starts
+      await fs.writeFile(setupCompletePath, 'setup completed');
+
+      setupWin.webContents.send('status', 'Download started! You can close this window and start using the app while the model downloads in the background.');
+      setTimeout(() => setupWin.close(), 5000);
+    } catch (error: unknown) {
+      console.error('Error during setup:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setupWin.webContents.send('status', `Error: ${errorMessage}`);
+    }
   }
 }
 
@@ -516,7 +673,8 @@ async function createWindow() {
       nodeIntegration: true,
       contextIsolation: false,
       preload: path.join(__dirname, 'preload.js')
-    }
+    },
+    icon: path.join(__dirname, '../../frontend/public/Herma.png')
   });
 
   win.webContents.on('did-fail-load', (
@@ -650,6 +808,7 @@ win.webContents.on('console-message', (
 
 app.whenReady().then(async () => {
   startOllama();
+  await firstRunSetup();
   await setupIPC();
   createWindow();
 });

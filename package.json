@@ -1,5 +1,5 @@
 {
-  "name": "herma",
+  "name": "Herma",
   "version": "0.0.0",
   "description": "Locally-run llm application",
   "author": "Niko Barciak, Nick Pianfetti",
@@ -14,8 +14,8 @@
     "build:electron": "tsc -p electron/tsconfig.json",
     "install-all": "npm install && python3 -m pip install -r python/requirements.txt",
     "lint": "eslint .",
-    "clean": "rimraf electron/dist frontend/dist",
-    "test:built": "cross-env NODE_ENV=production electron electron/dist/main.js",
+    "clean": "rimraf electron/dist frontend/dist dist python/dist",
+    "test:built": "open dist/mac-arm64/Herma.app",
     "postinstall": "tsc -p scripts/tsconfig.json"
   },
   "dependencies": {
@@ -48,42 +48,87 @@
     "vite": "^5.4.10"
   },
   "build": {
-    "extraResources": [
-      {
-        "from": "resources/ollama",
-        "to": "ollama",
-        "filter": ["**/*"]
-      },
-      {
-        "from": "dist/herma_python",
-        "to": "python/herma_python",
-        "filter": ["**/*"]
-      },
-      {
-        "from": "python",
-        "to": "python",
-        "filter": ["**/*"]
-      },
-      {
-        "from": "scripts/dist/postinstall.js",
-        "to": "scripts/postinstall.js"
-      }
-    ],
-    "asarUnpack": ["resources/ollama/**", "python/herma_python*"],
     "afterPack": "./scripts/dist/after-pack.js",
+    "asarUnpack": ["python/herma_python*"],
     "mac": {
       "target": ["dmg"],
       "hardenedRuntime": true,
-      "icon": "frontend/public/Herma.icns"
+      "icon": "frontend/public/Herma.icns",
+      "extraResources": [
+        {
+          "from": "resources/ollama/darwin",
+          "to": "ollama/darwin",
+          "filter": ["**/*"]
+        },
+        {
+          "from": "dist/herma_python",
+          "to": "python/herma_python",
+          "filter": ["**/*"]
+        },
+        {
+          "from": "python",
+          "to": "python",
+          "filter": ["**/*"]
+        },
+        {
+          "from": "scripts/dist/postinstall.js",
+          "to": "scripts/postinstall.js"
+        }
+      ]
+    },
+    "dmg": {
+      "format": "UDZO"
     },
     "linux": {
       "target": ["AppImage"],
       "executableName": "herma",
-      "icon": "frontend/public/Herma.jpeg"
+      "icon": "frontend/public/Herma.ico",
+      "extraResources": [
+        {
+          "from": "resources/ollama/linux",
+          "to": "ollama/linux",
+          "filter": ["**/*"]
+        },
+        {
+          "from": "dist/herma_python",
+          "to": "python/herma_python",
+          "filter": ["**/*"]
+        },
+        {
+          "from": "python",
+          "to": "python",
+          "filter": ["**/*"]
+        },
+        {
+          "from": "scripts/dist/postinstall.js",
+          "to": "scripts/postinstall.js"
+        }
+      ]
     },
     "win": {
       "target": ["nsis"],
-      "icon": "frontend/public/Herma.ico"
+      "icon": "frontend/public/Herma.ico",
+      "extraResources": [
+        {
+          "from": "resources/ollama/win",
+          "to": "ollama/win",
+          "filter": ["**/*"]
+        },
+        {
+          "from": "dist/herma_python",
+          "to": "python/herma_python",
+          "filter": ["**/*"]
+        },
+        {
+          "from": "python",
+          "to": "python",
+          "filter": ["**/*"]
+        },
+        {
+          "from": "scripts/dist/postinstall.js",
+          "to": "scripts/postinstall.js"
+        }
+      ]
     }
   }
 }
