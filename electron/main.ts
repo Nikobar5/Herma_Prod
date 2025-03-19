@@ -329,11 +329,37 @@ async function firstRunSetup() {
   try {
     await fs.access(setupCompletePath);
     console.log('Setup already completed');
+    return;
   } catch (err) {
     // File doesn't exist, this is first run
     console.log('First run detected, setting up models...');
 
-    // Show a setup window with embedded HTML
+    // Wait for Ollama to be ready before showing the setup window
+    console.log('Waiting for Ollama to initialize...');
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    // Check if Ollama is ready by trying to list available models
+    let ollama_ready = false;
+    for (let i = 0; i < 10; i++) {
+      try {
+        const response = await fetch('http://localhost:11434/api/tags');
+        if (response.ok) {
+          ollama_ready = true;
+          console.log('Ollama is ready to accept connections');
+          break;
+        }
+      } catch (e) {
+        console.log(`Attempt ${i+1}: Ollama not ready yet, waiting...`);
+      }
+      await new Promise(resolve => setTimeout(resolve, 3000));
+    }
+
+    if (!ollama_ready) {
+      console.error('Ollama failed to start properly within timeout');
+      return;
+    }
+
+    // Load the HTML content directly
     const setupWin = new BrowserWindow({
       width: 500,
       height: 300,
@@ -343,63 +369,46 @@ async function firstRunSetup() {
       }
     });
 
-    // Load the HTML content directly instead of from a file
+    // Add error event handler
+    setupWin.webContents.on('did-fail-load', (_event: Electron.Event, errorCode: number, errorDescription: string) => {
+      console.error(`Setup window failed to load: ${errorDescription} (${errorCode})`);
+    });
+
+    // Load a simpler HTML content
     setupWin.loadURL(`data:text/html,
     <html>
-    <head>
-      <title>Herma Setup</title>
-      <style>
-        body {
-          font-family: Arial, sans-serif;
-          padding: 20px;
-          text-align: center;
-          background-color: #f5f5f5;
-        }
-        .container {
-          max-width: 400px;
-          margin: 0 auto;
-          background: white;
-          padding: 20px;
-          border-radius: 5px;
-          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        h2 {
-          color: #333;
-        }
-        #status {
-          margin-top: 20px;
-          padding: 10px;
-          background: #f0f0f0;
-          border-radius: 4px;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <h2>Herma Initial Setup</h2>
-        <p>Setting up language model for first use...</p>
-        <div id="status">Initializing...</div>
-      </div>
+    <head><title>Herma Setup</title></head>
+    <body style="font-family:Arial; padding:20px; text-align:center">
+      <h2>Herma Initial Setup</h2>
+      <p>Setting up language model for first use...</p>
+      <div id="status">Initializing...</div>
       <script>
-        const { ipcRenderer } = require('electron');
-
-        ipcRenderer.on('status', (event, message) => {
-          document.getElementById('status').textContent = message;
-        });
+        try {
+          const { ipcRenderer } = require('electron');
+          ipcRenderer.on('status', (event, message) => {
+            document.getElementById('status').textContent = message;
+          });
+        } catch(e) {
+          document.getElementById('status').textContent = 'Error: ' + e.message;
+        }
       </script>
     </body>
     </html>`);
 
     // Pull the model
     try {
-      setupWin.webContents.send('status', 'Downloading language model. This may take several minutes...');
+      setupWin.webContents.send('status', 'Downloading models. This may take several minutes...');
 
-      // Just call fetch without assigning to a variable
-      await fetch('http://localhost:11434/api/pull', {
+      // Pull the model
+      const response = await fetch('http://localhost:11434/api/pull', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({name: 'llama3.2:1b'})
       });
+
+      if (!response.ok) {
+        throw new Error(`Failed to pull model: ${response.status} ${response.statusText}`);
+      }
 
       // Create marker file when download starts
       await fs.writeFile(setupCompletePath, 'setup completed');
