@@ -399,21 +399,34 @@ async function firstRunSetup() {
     try {
       setupWin.webContents.send('status', 'Downloading models. This may take several minutes...');
 
-      // Pull the model
-      const response = await fetch('http://localhost:11434/api/pull', {
+      // Pull the first model (llama3.2:1b)
+      setupWin.webContents.send('status', 'Downloading llama3.2:1b model...');
+      let response = await fetch('http://localhost:11434/api/pull', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({name: 'llama3.2:1b'})
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to pull model: ${response.status} ${response.statusText}`);
+        throw new Error(`Failed to pull llama3.2:1b model: ${response.status} ${response.statusText}`);
       }
 
-      // Create marker file when download starts
+      // Pull the second model (all-minilm)
+      setupWin.webContents.send('status', 'Downloading all-minilm model...');
+      response = await fetch('http://localhost:11434/api/pull', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name: 'all-minilm'})
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to pull all-minilm model: ${response.status} ${response.statusText}`);
+      }
+
+      // Create marker file when downloads are complete
       await fs.writeFile(setupCompletePath, 'setup completed');
 
-      setupWin.webContents.send('status', 'Download started! You can close this window and start using the app while the model downloads in the background.');
+      setupWin.webContents.send('status', 'Downloads started! You can close this window and start using the app while the models download in the background.');
       setTimeout(() => setupWin.close(), 5000);
     } catch (error: unknown) {
       console.error('Error during setup:', error);
