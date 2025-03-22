@@ -1,8 +1,9 @@
 # -*- mode: python ; coding: utf-8 -*-
-
 import os
 import sys
 import PyInstaller
+import importlib_resources
+import glob
 
 # Get the path to PyInstaller's runtime hooks
 runtime_hooks_path = os.path.join(
@@ -11,11 +12,28 @@ runtime_hooks_path = os.path.join(
     'rthooks'
 )
 
+chromadb_hook_content = """
+import os
+import sys
+import PyInstaller
+import importlib_resources
+
+if hasattr(sys, '_MEIPASS'):
+    # Tell chromadb where to find its migrations
+    os.environ['CHROMADB_MIGRATIONS_PATH'] = os.path.join(sys._MEIPASS, 'chromadb', 'migrations')
+"""
+
+chromadb_hook_path = 'pyi_rth_chromadb.py'
+with open(chromadb_hook_path, 'w') as f:
+    f.write(chromadb_hook_content)
+
+migrations_path = importlib_resources.files('chromadb').joinpath('migrations')
+
 a = Analysis(
     ['../python/scripts/main.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[(str(migrations_path), 'chromadb/migrations'),],
     hiddenimports=[
         # Core dependencies
         'pydantic',
@@ -23,6 +41,20 @@ a = Analysis(
         'pydantic.deprecated.decorator',
         'pydantic._internal',
         'pydantic._internal._validators',
+        'chromadb.migrations.embeddings_queue',
+        'chromadb',
+        'chromadb.api',
+        'chromadb.api.models',
+        'chromadb.config',
+        'chromadb.db',
+        'chromadb.db.impl',
+        'chromadb.db.impl.sqlite',
+        'importlib_resources',
+        'chromadb.quota',
+        'chromadb.quota.simple_quota_enforcer',
+        'chromadb.rate_limit.simple_rate_limit',
+        'chromadb.segment.impl.metadata',
+        'chromadb.segment.impl.metadata.sqlite',
 
         # Add missing dependencies that are causing issues
         'openpyxl',
@@ -53,7 +85,7 @@ a = Analysis(
         'sys',
         'os',
         'langchain_ollama.embeddings',
-        'ollama',  # Fixed missing comma here
+        'ollama',
         'chromadb',
         'chromadb.utils',
         'chromadb.utils.embedding_functions',
@@ -80,6 +112,7 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[
         # Explicitly include all necessary runtime hooks
+        chromadb_hook_path,  # Fixed missing comma here
         os.path.join(runtime_hooks_path, 'pyi_rth_pkgutil.py'),
         os.path.join(runtime_hooks_path, 'pyi_rth_inspect.py'),
         os.path.join(runtime_hooks_path, 'pyi_rth_multiprocessing.py'),
@@ -88,12 +121,13 @@ a = Analysis(
     ],
     excludes=[],
     noarchive=False,
-    optimize=0
+    optimize=0,
+    # Move these options to the Analysis constructor
+    collect_submodules=['numpy', 'openpyxl'],
+    collect_all=['numpy', 'openpyxl']
 )
 
 # Include all Python scripts as data files
-import glob
-
 # Use a direct path to your Python scripts
 python_scripts_dir = os.path.join(os.getcwd(), 'python', 'scripts')
 script_files = glob.glob(os.path.join(python_scripts_dir, '*.py'))
@@ -101,10 +135,6 @@ script_files = glob.glob(os.path.join(python_scripts_dir, '*.py'))
 for script in script_files:
     filename = os.path.basename(script)
     a.datas += [(filename, script, 'DATA')]
-
-# Add specific data files for numpy and openpyxl if needed
-# This can help with loading these libraries
-# a.datas += [('numpy.libs', 'path/to/numpy/libs', 'DATA')]
 
 pyz = PYZ(a.pure)
 
@@ -126,8 +156,6 @@ exe = EXE(
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
-    entitlements_file=None,
-    # Add these options for better error handling
-    collect_submodules=['numpy', 'openpyxl'],
-    collect_all=['numpy', 'openpyxl']
+    entitlements_file=None
+    # Removed collect_submodules and collect_all from here
 )

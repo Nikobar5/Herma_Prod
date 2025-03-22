@@ -222,8 +222,7 @@ class Session:
         self.session_history = new_history
 
         if clipped_history:
-            project_root = Path(__file__).resolve().parents[2]
-            storage_dir = project_root / 'storage' / 'chat_history_storage'
+            storage_dir = Path(os.environ.get('ELECTRON_APP_DATA_DIR', '.')) / 'storage' / 'chat_history_storage'
             os.makedirs(storage_dir, exist_ok=True)
 
             existing_content = ""

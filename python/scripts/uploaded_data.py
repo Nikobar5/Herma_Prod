@@ -216,21 +216,49 @@ class Uploaded_data:
         return [Document(page_content=text, metadata={"source": json_path})]
 
     def add_to_chroma(self):
-        chunks = self.split_documents()
-        db_path = self.get_db_path()
-        db = Chroma(
-            persist_directory=str(db_path),
-            embedding_function=get_embedding_function()
-        )
+        try:
+            print(f"Starting add_to_chroma for {self.name}")
+            chunks = self.split_documents()
+            print(f"Split documents into {len(chunks)} chunks")
 
-        chunks_with_ids = self.calculate_chunk_ids(chunks)
+            db_path = self.get_db_path()
+            print(f"Got DB path: {db_path}, exists: {os.path.exists(str(db_path))}")
 
-        existing_items = db.get(include=[])
-        existing_ids = set(existing_items["ids"])
-        new_chunks = chunks_with_ids
-        new_chunk_ids = [chunk.metadata["id"] for chunk in new_chunks]
-        db.add_documents(new_chunks, ids=new_chunk_ids)
-        end_time = time.time()
+            # Double check directory creation
+            os.makedirs(str(db_path), exist_ok=True)
+            print(f"Created directory, exists now: {os.path.exists(str(db_path))}")
+
+            # Try with a temporary directory if needed
+            if not os.path.exists(str(db_path)):
+                import tempfile
+                temp_dir = tempfile.mkdtemp()
+                print(f"Using temporary directory as fallback: {temp_dir}")
+                db_path = temp_dir
+
+            print(f"Initializing Chroma with path: {db_path}")
+            db = Chroma(
+                persist_directory=str(db_path),
+                embedding_function=get_embedding_function()
+            )
+
+            chunks_with_ids = self.calculate_chunk_ids(chunks)
+            print(f"Calculated chunk IDs")
+
+            existing_items = db.get(include=[])
+            existing_ids = set(existing_items["ids"])
+            print(f"Got {len(existing_ids)} existing items")
+
+            new_chunks = chunks_with_ids
+            new_chunk_ids = [chunk.metadata["id"] for chunk in new_chunks]
+            print(f"Adding {len(new_chunks)} new chunks")
+
+            db.add_documents(new_chunks, ids=new_chunk_ids)
+            print(f"Successfully added documents to Chroma")
+        except Exception as e:
+            print(f"Error in add_to_chroma: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            raise
 
     def calculate_chunk_ids(self, chunks):
         last_page_id = None
@@ -297,23 +325,41 @@ class Uploaded_data:
 
     @staticmethod
     def get_project_root():
-        return Path(__file__).resolve().parents[2]
+        return Path(os.environ.get('ELECTRON_APP_DATA_DIR', '.'))
 
     def get_db_path(self):
-        return self.get_project_root() / 'storage' / 'db_store' / self.vector_database_path
+        db_root = self.get_project_root() / 'storage' / 'db_store'
+        # Ensure the directory exists
+        os.makedirs(str(db_root), exist_ok=True)
+        # Ensure the specific database directory exists
+        full_path = db_root / self.vector_database_path
+        os.makedirs(str(full_path), exist_ok=True)
+        return full_path
 
     @staticmethod
     def delete_vector_db(filename):
         db_root = Uploaded_data.get_project_root() / 'storage' / 'db_store'
 
-        matching_dbs = [d for d in os.listdir(str(db_root))
-                        if d.startswith(filename + "_") or d == filename]
+        # Ensure the directory exists
+        os.makedirs(str(db_root), exist_ok=True)
 
-        for db_name in matching_dbs:
-            db_path = db_root / db_name
-            if os.path.exists(str(db_path)):
-                try:
-                    import shutil
-                    shutil.rmtree(str(db_path))
-                except Exception as e:
-                    print(f"Error deleting database {db_path}: {e}")
+        # Check if directory exists before trying to list it
+        if not os.path.exists(str(db_root)):
+            print(f"Database root directory does not exist: {db_root}")
+            return
+
+        try:
+            matching_dbs = [d for d in os.listdir(str(db_root))
+                            if d.startswith(filename + "_") or d == filename]
+
+            for db_name in matching_dbs:
+                db_path = db_root / db_name
+                if os.path.exists(str(db_path)):
+                    try:
+                        import shutil
+                        shutil.rmtree(str(db_path))
+                    except Exception as e:
+                        print(f"Error deleting database {db_path}: {e}")
+        except Exception as e:
+            print(f"Error listing database directory {db_root}: {e}")
+

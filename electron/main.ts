@@ -35,7 +35,7 @@ interface PythonMessage {
 
 type MessageCallback = (message: PythonMessage) => void;
 
-const STORAGE_DIR = path.join(__dirname, '../../storage');
+const STORAGE_DIR = path.join(app.getPath('userData'), 'storage');
 const UPLOADS_DIR = path.join(STORAGE_DIR, 'uploads');
 const PYTHON_DIR = path.join(__dirname, '../../python/scripts');
 
@@ -93,7 +93,8 @@ async function initializePythonShell(): Promise<void> {
       env: {
         ...process.env,
         PYTHONUNBUFFERED: '1',  // Ensure unbuffered output
-        PYTHONDEVMODE: '1'      // Enable development mode for more warnings
+        PYTHONDEVMODE: '1',      // Enable development mode for more warnings
+        ELECTRON_APP_DATA_DIR: app.getPath('userData')
       }
     });
 
@@ -496,7 +497,7 @@ ipcMain.handle('start-chat', async (event: Electron.IpcMainInvokeEvent, { messag
   ipcMain.handle('upload-file', async (_event: Electron.IpcMainInvokeEvent, { filename, data }: FileUpload) => {
     await ensurePythonShell();
     const requestId = (++requestCounter).toString();
-    const uploadPath = path.join(STORAGE_DIR, 'uploads');
+    const uploadPath = path.join(app.getPath('userData'), 'storage', 'uploads');
     await fs.mkdir(uploadPath, { recursive: true });
     const tempPath = path.join(uploadPath, `temp_${filename}`);
     await fs.writeFile(tempPath, data);
@@ -646,7 +647,7 @@ ipcMain.handle('interrupt-chat', async () => {
 
   ipcMain.handle('open-file', async (_event: Electron.IpcMainInvokeEvent, { filename }: { filename: string }) => {
     try {
-      const filePath = path.join(UPLOADS_DIR, filename);
+    const filePath = path.join(app.getPath('userData'), 'storage', 'uploads', filename);
 
       await fs.access(filePath);
 

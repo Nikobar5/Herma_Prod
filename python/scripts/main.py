@@ -1,3 +1,4 @@
+import os
 import sys
 import json
 import shutil
@@ -13,7 +14,7 @@ class PythonServer:
     def __init__(self):
         self.active_requests = {}
         root_dir = Path(__file__).parent.parent.parent
-        self.storage_dir = root_dir / "storage"
+        self.storage_dir = Path(os.environ.get('ELECTRON_APP_DATA_DIR', '.')) / "storage"
         self.upload_dir = self.storage_dir / "uploads"
         self.storage_dir.mkdir(exist_ok=True)
         self.upload_dir.mkdir(exist_ok=True)
@@ -254,9 +255,12 @@ class PythonServer:
     def run(self):
         while self.is_running:
             try:
+                print("Waiting for input...", flush=True)  # Add this debug line
                 line = sys.stdin.readline()
                 if not line:
+                    print("Empty line received, breaking loop", flush=True)  # Add this debug line
                     break
+                print(f"Received input: {line[:50]}...", flush=True)  # Add this to see what's coming in
 
                 data = json.loads(line)
                 request_id = data.get('requestId')
@@ -298,5 +302,11 @@ class PythonServer:
 
 
 if __name__ == "__main__":
-    server = PythonServer()
-    server.run()
+    try:
+        server = PythonServer()
+        server.run()
+    except Exception as e:
+        print(f"FATAL ERROR: {e}", file=sys.stderr, flush=True)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
+        sys.exit(1)  # Exit with error code
